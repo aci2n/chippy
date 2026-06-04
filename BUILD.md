@@ -77,7 +77,7 @@ These are the files you edit. Everything else under this list’s “Generated�
 | `tests/test_core.c` | Unit tests for hex, crypto, tx, chain, and storage. |
 | `tests/test_cli.sh` | CLI integration test (init → mint → send → validate). |
 | `include/chippy.h` | Public C API (compiled as part of the binary, not installed). |
-| `src/*.c`, `cli/main.c` | Engine and CLI sources listed in `chippy_SOURCES`. |
+| `src/*.c` | Engine and CLI (`main.c`) sources listed in `chippy_SOURCES`. |
 
 ### `web/`
 

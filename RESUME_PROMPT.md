@@ -112,7 +112,7 @@ chippy/                    # repo root (name on GitHub can be chippy)
     Makefile.am
     include/chippy.h
     src/util.c crypto.c tx.c chain.c storage.c
-    cli/main.c
+    src/main.c
   web/
     Makefile.am            # placeholder: echo "not implemented"
 ```

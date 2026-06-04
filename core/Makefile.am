@@ -15,11 +15,11 @@ bin_PROGRAMS = chippy
 # tx: transaction sign/verify and line format
 # chain: blocks, validation, balances
 # storage: .chippy/ load/save
-# cli: command-line tool
+# main: command-line entry point
 chippy_SOURCES = \
 	include/chippy.h \
 	$(CHIPPY_ENGINE_SRC) \
-	cli/main.c
+	src/main.c
 # link against libsodium
 chippy_LDADD = @LIBSODIUM_LIBS@
 # unit test binary (not installed)
