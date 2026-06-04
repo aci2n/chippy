@@ -114,6 +114,14 @@ done:
   return rc;
 }
 
+int chippy_op_mint(const char *dir, const chippy_tx *tx)
+{
+  if (tx == NULL || tx->type != CHIPPY_TX_MINT) {
+    return -1;
+  }
+  return chippy_op_submit_tx(dir, tx);
+}
+
 int chippy_op_transfer(const char *dir, const chippy_tx *tx)
 {
   if (tx == NULL || tx->type != CHIPPY_TX_TRANSFER) {

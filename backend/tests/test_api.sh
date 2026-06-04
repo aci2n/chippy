@@ -20,13 +20,16 @@ ALICE_SK=$(echo "$ALICE_KEYS" | sed -n 's/^secret=//p')
 BOB=$("$CHIPPY" keygen | sed -n 's/^address=//p')
 
 MINT_SIG=$("$CHIPPY" sign-mint "$MINT_SK" "$MINT_ADDR" "$ALICE" 1000)
-"$CHIPPY" mint "$ALICE" 1000 "$MINT_SIG" --dir "$DIR"
 
 "$BACKEND" --dir "$DIR" --listen "127.0.0.1:${PORT}" &
 PID=$!
 sleep 0.3
 
 curl -sf "$BASE/health" | grep -q '"ok":true'
+
+curl -sf -X POST "$BASE/api/v1/mint" \
+  -H "Content-Type: application/json" \
+  -d "{\"to\":\"$ALICE\",\"amount\":1000,\"sig\":\"$MINT_SIG\"}"
 
 test "$(curl -sf "$BASE/api/v1/balance/$ALICE" | sed -n 's/.*"balance":\([0-9]*\).*/\1/p')" = "1000"
 

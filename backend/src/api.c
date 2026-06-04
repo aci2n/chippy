@@ -148,7 +148,7 @@ void api_handle(struct api_ctx *ctx, const char *method, size_t method_len, cons
     tx.to[CHIPPY_HEX_ADDR_LEN] = '\0';
     tx.amount = amount;
     strncpy(tx.sig, sig, CHIPPY_HEX_SIG_LEN);
-    rc = chippy_op_submit_tx(ctx->data_dir, &tx);
+    rc = chippy_op_mint(ctx->data_dir, &tx);
     if (rc != 0) {
       resp_json(resp, 409, "{\"error\":\"mint rejected\"}");
       return;

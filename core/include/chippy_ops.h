@@ -22,6 +22,9 @@ int chippy_op_init(const char *dir, char *mint_address_out, char *mint_secret_ou
  */
 int chippy_op_submit_tx(const char *dir, const chippy_tx *tx);
 
+/* append pre-signed mint */
+int chippy_op_mint(const char *dir, const chippy_tx *tx);
+
 /* append pre-signed transfer */
 int chippy_op_transfer(const char *dir, const chippy_tx *tx);
 

@@ -124,7 +124,7 @@ static int cmd_mint(int argc, char **argv)
   tx.amount = (uint64_t)amount;
   strncpy(tx.sig, argv[4], CHIPPY_HEX_SIG_LEN);
   tx.sig[CHIPPY_HEX_SIG_LEN] = '\0';
-  if (chippy_op_submit_tx(data_dir, &tx) != 0) {
+  if (chippy_op_mint(data_dir, &tx) != 0) {
     fprintf(stderr, "mint failed\n");
     return 1;
   }
