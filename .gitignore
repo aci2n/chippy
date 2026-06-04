@@ -43,3 +43,7 @@ chippy-asan
 .chippy/
 *.key
 
+# emacs
+*~
+\#*#
+.#*
