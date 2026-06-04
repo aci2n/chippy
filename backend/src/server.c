@@ -232,7 +232,7 @@ int http_server_run(struct api_ctx *ctx, const char *host, const char *port)
     return -1;
   }
 
-  fprintf(stderr, "httpapi listening on %s:%s (data dir %s)\n", host, port, ctx->data_dir);
+  fprintf(stderr, "backend listening on %s:%s (data dir %s)\n", host, port, ctx->data_dir);
 
   for (;;) {
     client_fd = accept(listen_fd, NULL, NULL);

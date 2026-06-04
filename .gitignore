@@ -33,11 +33,11 @@ web/Makefile.in
 core/chippy
 core/libchippy.a
 core/test_core
-httpapi/httpapi
-httpapi/Makefile
-httpapi/Makefile.in
-httpapi/**/*.o
-httpapi/.deps/
+backend/backend
+backend/Makefile
+backend/Makefile.in
+backend/**/*.o
+backend/.deps/
 core/chippy-asan
 *.log
 *.trs

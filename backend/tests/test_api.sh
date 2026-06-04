@@ -1,10 +1,10 @@
 #!/bin/sh
-# integration test for httpapi REST backend
+# integration test for backend REST API
 set -e
 
-HTTPAPI="${CHIPPY_HTTPAPI:-./httpapi}"
+BACKEND="${CHIPPY_BACKEND:-./backend}"
 CHIPPY="${CHIPPY:-../core/chippy}"
-DIR=$(mktemp -d "${TMPDIR:-/tmp}/chippy-httpapi-XXXXXX")
+DIR=$(mktemp -d "${TMPDIR:-/tmp}/chippy-backend-XXXXXX")
 PORT=${CHIPPY_TEST_PORT:-18080}
 BASE="http://127.0.0.1:${PORT}"
 MINT_TOKEN="test-mint-secret"
@@ -13,7 +13,7 @@ trap 'kill $PID 2>/dev/null; rm -rf "$DIR"' EXIT
 
 "$CHIPPY" init --dir "$DIR"
 
-"$HTTPAPI" --dir "$DIR" --listen "127.0.0.1:${PORT}" --mint-token "$MINT_TOKEN" &
+"$BACKEND" --dir "$DIR" --listen "127.0.0.1:${PORT}" --mint-token "$MINT_TOKEN" &
 PID=$!
 sleep 0.3
 
@@ -42,4 +42,4 @@ test "$(curl -sf "$BASE/api/v1/balance/$BOB" | sed -n 's/.*"balance":\([0-9]*\).
 
 curl -sf "$BASE/api/v1/chain/validate" | grep -q '"ok":true'
 
-echo "ok httpapi integration"
+echo "ok backend integration"

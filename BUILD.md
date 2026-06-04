@@ -1,6 +1,6 @@
 # Building Chippy
 
-Chippy uses GNU Autotools at the **repository root** and builds the `chippy` CLI from `core/` and the `httpapi` REST backend. The `web/` directory is a stub for now.
+Chippy uses GNU Autotools at the **repository root** and builds the `chippy` CLI from `core/` and the `backend` REST server. The `web/` directory is a stub for now.
 
 You only need the three usual steps: generate `configure`, run `./configure`, then `make`.
 
@@ -20,7 +20,7 @@ From the repo root:
 make
 ```
 
-Binaries: `core/chippy` (CLI), `httpapi/httpapi` (HTTP API server).
+Binaries: `core/chippy` (CLI), `backend/backend` (HTTP API server).
 
 To rebuild after pulling changes to `configure.ac` or any `Makefile.am`:
 
@@ -36,7 +36,7 @@ make
 |------|---------|----------------|
 | 1. Bootstrap | `./autogen.sh` | Runs `autoreconf -fi` to create `configure` and `Makefile.in` files |
 | 2. Configure | `./configure` | Probes the host (compiler, libsodium) and writes `Makefile`s |
-| 3. Build | `make` | Recurses into `core/`, `httpapi/`, and `web/` |
+| 3. Build | `make` | Recurses into `core/`, `backend/`, and `web/` |
 
 Day-to-day work is usually just `make` once `./configure` has been run.
 
@@ -81,11 +81,11 @@ These are the files you edit. Everything else under this list’s “Generated�
 | `libchippy.a` | Static library: engine + ops (linked by `chippy` and tests). |
 | `src/main.c` | CLI only; dispatches to `chippy_op_*`. |
 
-### `httpapi/`
+### `backend/`
 
 | File | Role |
 |------|------|
-| `Makefile.am` | Builds `httpapi` binary linked against `core/libchippy.a`. |
+| `Makefile.am` | Builds `backend` binary linked against `core/libchippy.a`. |
 | `include/chippy_ops.h` (via `-I../core/include`) | Ledger operations. |
 | `include/api.h`, `src/api.c` | REST route handlers (JSON). |
 | `src/server.c` | TCP HTTP/1.1 server using **picohttpparser** (vendored). |
@@ -95,7 +95,7 @@ These are the files you edit. Everything else under this list’s “Generated�
 Run the API server:
 
 ```sh
-./httpapi/httpapi --dir /tmp/.chippy --listen 127.0.0.1:8080 --mint-token dev-secret
+./backend/backend --dir /tmp/.chippy --listen 127.0.0.1:8080 --mint-token dev-secret
 ```
 
 Optional: set `CHIPPY_MINT_TOKEN` instead of `--mint-token` to require `X-Chippy-Mint-Token` on `POST /api/v1/mint`.
