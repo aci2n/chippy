@@ -31,7 +31,13 @@ web/Makefile.in
 
 # build
 core/chippy
+core/libchippy.a
 core/test_core
+httpapi/httpapi
+httpapi/Makefile
+httpapi/Makefile.in
+httpapi/**/*.o
+httpapi/.deps/
 core/chippy-asan
 *.log
 *.trs

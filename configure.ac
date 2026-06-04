@@ -10,6 +10,6 @@ AC_PROG_RANLIB
 # libsodium via pkg-config; sets LIBSODIUM_CFLAGS and LIBSODIUM_LIBS
 PKG_CHECK_MODULES([LIBSODIUM], [libsodium >= 1.0.0])
 # generate Makefiles from Makefile.in templates
-AC_CONFIG_FILES([Makefile core/Makefile web/Makefile])
+AC_CONFIG_FILES([Makefile core/Makefile httpapi/Makefile web/Makefile])
 # emit configured files and finish
 AC_OUTPUT
