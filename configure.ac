@@ -6,6 +6,7 @@ AC_INIT([chippy], [0.1.0], [])
 AM_INIT_AUTOMAKE([foreign subdir-objects])
 # locate a C compiler
 AC_PROG_CC
+AC_PROG_RANLIB
 # libsodium via pkg-config; sets LIBSODIUM_CFLAGS and LIBSODIUM_LIBS
 PKG_CHECK_MODULES([LIBSODIUM], [libsodium >= 1.0.0])
 # generate Makefiles from Makefile.in templates

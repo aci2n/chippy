@@ -1,4 +1,5 @@
 #include "chippy.h"
+#include "chippy_ops.h"
 
 #include <sodium.h>
 #include <stdio.h>
@@ -203,6 +204,39 @@ static void test_chain_flow(char *dir)
   chippy_chain_free(&chain);
 }
 
+static void test_ops_flow(char *dir)
+{
+  chippy_tx tx;
+  char alice_addr[CHIPPY_HEX_ADDR_LEN + 1];
+  char alice_sec[CHIPPY_HEX_SEC_LEN + 1];
+  char bob_addr[CHIPPY_HEX_ADDR_LEN + 1];
+  char bob_sec[CHIPPY_HEX_SEC_LEN + 1];
+  char sig[CHIPPY_HEX_SIG_LEN + 1];
+  uint64_t balance;
+
+  ASSERT(chippy_op_init(dir) == 0, "op init");
+  ASSERT(chippy_op_keygen(alice_addr, alice_sec) == 0, "op keygen alice");
+  ASSERT(chippy_op_keygen(bob_addr, bob_sec) == 0, "op keygen bob");
+  (void)bob_sec;
+  ASSERT(chippy_op_mint(dir, alice_addr, 1000) == 0, "op mint");
+  ASSERT(chippy_op_balance(dir, alice_addr, &balance) == 0, "op balance alice");
+  ASSERT(balance == 1000, "op alice has 1000");
+  ASSERT(chippy_op_sign_transfer(alice_sec, alice_addr, bob_addr, 250, sig) == 0,
+         "op sign transfer");
+  memset(&tx, 0, sizeof(tx));
+  tx.type = CHIPPY_TX_TRANSFER;
+  strncpy(tx.from, alice_addr, CHIPPY_HEX_ADDR_LEN);
+  strncpy(tx.to, bob_addr, CHIPPY_HEX_ADDR_LEN);
+  tx.amount = 250;
+  strncpy(tx.sig, sig, CHIPPY_HEX_SIG_LEN);
+  ASSERT(chippy_op_transfer(dir, &tx) == 0, "op transfer");
+  ASSERT(chippy_op_balance(dir, alice_addr, &balance) == 0, "op balance alice after");
+  ASSERT(balance == 750, "op alice has 750");
+  ASSERT(chippy_op_balance(dir, bob_addr, &balance) == 0, "op balance bob");
+  ASSERT(balance == 250, "op bob has 250");
+  ASSERT(chippy_op_validate(dir) == 0, "op validate");
+}
+
 static void test_storage_roundtrip(void)
 {
   chippy_chain chain;
@@ -270,6 +304,14 @@ int main(void)
   test_dir_lock(dir);
   test_chain_flow(dir);
   free(dir);
+
+  dir = make_temp_dir();
+  if (dir == NULL) {
+    fail("temp dir ops");
+  } else {
+    test_ops_flow(dir);
+    free(dir);
+  }
   test_storage_roundtrip();
 
   if (failures > 0) {
