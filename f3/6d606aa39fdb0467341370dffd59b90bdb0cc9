@@ -1,0 +1,31 @@
+autogen.sh
+  s_9dbf29db24a4c7::t_3f9042ac30d36b 2,4
+Makefile.am
+  s_9dbf29db24a4c7::t_6afe8e63db145a 1
+BUILD.md
+  s_9dbf29db24a4c7::t_2af8805043ae10 1-130
+web/Makefile.am
+  s_9dbf29db24a4c7::t_912e954fedbb8a 1
+configure.ac
+  s_9dbf29db24a4c7::t_7ba7671e475b6e 1,3,5,7,9,11,13
+core/Makefile.am
+  s_9dbf29db24a4c7::t_f20d39df950e1b 6-11
+  s_9dbf29db24a4c7::t_d9df7872506deb 1,3,20
+  s_9dbf29db24a4c7::t_6b0111d5437a0a 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "f36d606aa39fdb0467341370dffd59b90bdb0cc9",
+  "prompts": {},
+  "sessions": {
+    "s_9dbf29db24a4c7": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "dd0d1440-af67-464a-9a13-8afe598dfa64",
+        "model": "composer-2.5"
+      },
+      "human_author": "aci2n <alvarocalace@hotmail.com>"
+    }
+  }
+}
