@@ -98,7 +98,7 @@ Run the API server:
 ./backend/backend --dir /tmp/.chippy --listen 127.0.0.1:8080
 ```
 
-Mint authority secret is **not** stored on the server (only `mint_pubkey` in `config`). Mint and transfer are client-signed; HTTP accepts `POST /api/v1/mint` and `POST /api/v1/transfer` with signatures.
+Mint authority secrets stay off-server. `config` lists `authorized_mint_key=<64 hex>` lines (multiple allowed; legacy `mint_pubkey=` still loads). Mint txs must be signed by any listed key. Use `chippy mint-key add <addr>` to authorize another minter. HTTP: `POST /api/v1/mint` and `POST /api/v1/transfer` with client signatures.
 
 ### `web/`
 

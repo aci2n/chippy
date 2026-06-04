@@ -99,7 +99,7 @@ int chippy_op_submit_tx(const char *dir, const chippy_tx *tx)
     goto done;
   }
   copy = *tx;
-  if (chippy_tx_verify(&copy, chain.mint_pubkey) != 0) {
+  if (chippy_tx_verify(&copy, &chain.mint_keys) != 0) {
     goto done;
   }
   if (append_tx_block(dir, &chain, &copy) != 0) {

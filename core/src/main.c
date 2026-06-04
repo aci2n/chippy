@@ -1,4 +1,5 @@
 #include "chippy_ops.h"
+#include "chippy.h"
 
 #include <sodium.h>
 #include <stdio.h>
@@ -18,8 +19,9 @@ static void usage(const char *prog)
           "  %s mint <to> <amount> <sig_hex> [--dir .chippy]\n"
           "  %s transfer <from> <to> <amount> <sig_hex> [--dir .chippy]\n"
           "  %s balance <addr> [--dir .chippy]\n"
+          "  %s mint-key add <mint_address> [--dir .chippy]\n"
           "  %s validate [--dir .chippy]\n",
-          prog, prog, prog, prog, prog, prog, prog, prog);
+          prog, prog, prog, prog, prog, prog, prog, prog, prog);
 }
 
 static void parse_global_dir(int argc, char **argv)
@@ -179,6 +181,29 @@ static int cmd_balance(int argc, char **argv)
   return 0;
 }
 
+static int cmd_mint_key_add(int argc, char **argv)
+{
+  if (argc < 3) {
+    return -1;
+  }
+  if (strlen(argv[2]) != CHIPPY_HEX_ADDR_LEN) {
+    fprintf(stderr, "invalid mint address\n");
+    return 1;
+  }
+  if (chippy_dir_lock(data_dir) != 0) {
+    fprintf(stderr, "data dir in use\n");
+    return 1;
+  }
+  if (chippy_storage_add_authorized_mint_key(data_dir, argv[2]) != 0) {
+    chippy_dir_unlock(data_dir);
+    fprintf(stderr, "mint-key add failed\n");
+    return 1;
+  }
+  chippy_dir_unlock(data_dir);
+  printf("authorized mint key %s\n", argv[2]);
+  return 0;
+}
+
 static int cmd_validate(int argc, char **argv)
 {
   (void)argc;
@@ -220,6 +245,8 @@ int main(int argc, char **argv)
     rc = cmd_transfer(argc, argv);
   } else if (strcmp(argv[1], "balance") == 0) {
     rc = cmd_balance(argc, argv);
+  } else if (strcmp(argv[1], "mint-key") == 0 && argc >= 3 && strcmp(argv[2], "add") == 0) {
+    rc = cmd_mint_key_add(argc, argv);
   } else if (strcmp(argv[1], "validate") == 0) {
     rc = cmd_validate(argc, argv);
   } else {

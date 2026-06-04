@@ -10,7 +10,7 @@
 #include <stdint.h>
 
 /*
- * create .chippy data dir (config mint_pubkey + genesis).
+ * create .chippy data dir (authorized_mint_key in config + genesis).
  * generates a new mint keypair; writes only the pubkey to config.
  * mint_address_out / mint_secret_out may be NULL; if set, receives hex strings.
  */

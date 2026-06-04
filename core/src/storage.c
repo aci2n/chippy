@@ -119,7 +119,7 @@ int chippy_storage_init(const char *dir, char *mint_address_out, char *mint_secr
   if (f == NULL) {
     return -1;
   }
-  fprintf(f, "mint_pubkey=%s\n", mint_addr);
+  fprintf(f, "authorized_mint_key=%s\n", mint_addr);
   fclose(f);
 
   memset(&genesis, 0, sizeof(genesis));
@@ -150,16 +150,41 @@ int chippy_storage_init(const char *dir, char *mint_address_out, char *mint_secr
   return 0;
 }
 
-int chippy_storage_load_config(const char *dir, char *mint_pubkey_out)
+static int parse_mint_key_line(const char *line, chippy_mint_keys *keys_out)
+{
+  const char *eq;
+  size_t prefix_len;
+  const char *prefix;
+
+  if (line == NULL || keys_out == NULL) {
+    return -1;
+  }
+  prefix = "authorized_mint_key=";
+  prefix_len = 20;
+  if (strncmp(line, prefix, prefix_len) != 0) {
+    prefix = "mint_pubkey=";
+    prefix_len = 12;
+    if (strncmp(line, prefix, prefix_len) != 0) {
+      return -1;
+    }
+  }
+  eq = line + prefix_len;
+  if (strlen(eq) != CHIPPY_HEX_PUB_LEN) {
+    return -1;
+  }
+  return chippy_mint_keys_add(keys_out, eq);
+}
+
+int chippy_storage_load_mint_keys(const char *dir, chippy_mint_keys *keys_out)
 {
   char config_path[CHIPPY_MAX_PATH];
   FILE *f;
   char line[256];
-  char *eq;
 
-  if (dir == NULL || mint_pubkey_out == NULL) {
+  if (dir == NULL || keys_out == NULL) {
     return -1;
   }
+  chippy_mint_keys_init(keys_out);
   if (path_join(config_path, sizeof(config_path), dir, "config") != 0) {
     return -1;
   }
@@ -169,21 +194,44 @@ int chippy_storage_load_config(const char *dir, char *mint_pubkey_out)
   }
   while (fgets(line, sizeof(line), f) != NULL) {
     line[strcspn(line, "\r\n")] = '\0';
-    if (strncmp(line, "mint_pubkey=", 12) != 0) {
+    if (parse_mint_key_line(line, keys_out) != 0) {
       continue;
     }
-    eq = line + 12;
-    if (strlen(eq) != CHIPPY_HEX_PUB_LEN) {
-      fclose(f);
-      return -1;
-    }
-    strncpy(mint_pubkey_out, eq, CHIPPY_HEX_PUB_LEN);
-    mint_pubkey_out[CHIPPY_HEX_PUB_LEN] = '\0';
-    fclose(f);
-    return 0;
   }
   fclose(f);
-  return -1;
+  if (keys_out->count == 0) {
+    return -1;
+  }
+  return 0;
+}
+
+int chippy_storage_add_authorized_mint_key(const char *dir, const char *addr_hex)
+{
+  chippy_mint_keys keys;
+  char config_path[CHIPPY_MAX_PATH];
+  FILE *f;
+
+  if (dir == NULL || addr_hex == NULL) {
+    return -1;
+  }
+  if (strlen(addr_hex) != CHIPPY_HEX_ADDR_LEN) {
+    return -1;
+  }
+  chippy_mint_keys_init(&keys);
+  (void)chippy_storage_load_mint_keys(dir, &keys);
+  if (chippy_mint_keys_contains(&keys, addr_hex)) {
+    return 0;
+  }
+  if (path_join(config_path, sizeof(config_path), dir, "config") != 0) {
+    return -1;
+  }
+  f = fopen(config_path, "a");
+  if (f == NULL) {
+    return -1;
+  }
+  fprintf(f, "authorized_mint_key=%s\n", addr_hex);
+  fclose(f);
+  return 0;
 }
 
 static void free_parsed_block(chippy_block *block)
@@ -222,7 +270,7 @@ int chippy_storage_load_chain(const char *dir, chippy_chain *chain)
     return -1;
   }
   chippy_chain_init(chain);
-  if (chippy_storage_load_config(dir, chain->mint_pubkey) != 0) {
+  if (chippy_storage_load_mint_keys(dir, &chain->mint_keys) != 0) {
     return -1;
   }
   if (path_join(chain_path, sizeof(chain_path), dir, "chain") != 0) {
@@ -360,7 +408,3 @@ int chippy_storage_append_block(const char *dir, const chippy_block *block)
   return 0;
 }
 
-int chippy_storage_mint_pubkey(const char *dir, char *pub_out)
-{
-  return chippy_storage_load_config(dir, pub_out);
-}

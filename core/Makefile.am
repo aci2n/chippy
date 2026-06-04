@@ -4,6 +4,7 @@ AM_CPPFLAGS = -I$(srcdir)/include @LIBSODIUM_CFLAGS@
 # engine + high-level ops (no CLI)
 CHIPPY_LIB_SRC = \
 	src/util.c \
+	src/mint_keys.c \
 	src/crypto.c \
 	src/tx.c \
 	src/chain.c \

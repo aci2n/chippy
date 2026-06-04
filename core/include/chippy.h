@@ -19,6 +19,12 @@
 
 #define CHIPPY_MAX_PATH 512
 #define CHIPPY_DEFAULT_DIR ".chippy"
+#define CHIPPY_MAX_MINT_KEYS 32
+
+typedef struct {
+  char keys[CHIPPY_MAX_MINT_KEYS][CHIPPY_HEX_ADDR_LEN + 1];
+  size_t count;
+} chippy_mint_keys;
 
 typedef enum {
   CHIPPY_TX_MINT = 0,      /* issue units; signed by mint authority */
@@ -46,7 +52,7 @@ typedef struct {
   chippy_block *blocks;
   size_t block_count;
   size_t block_cap;
-  char mint_pubkey[CHIPPY_HEX_PUB_LEN + 1]; /* from config; required for validate */
+  chippy_mint_keys mint_keys; /* authorized_mint_key= lines in config */
 } chippy_chain;
 
 /* --- util --- */
@@ -82,8 +88,13 @@ int chippy_tx_sign_payload(const chippy_tx *tx, unsigned char *buf, size_t buf_c
                            size_t *out_len);
 /* fill tx->sig; tx must have type/fields set (mint or transfer) */
 int chippy_tx_sign(chippy_tx *tx, const unsigned char *sk);
-/* check sig against mint_pubkey (mint) or tx->from (transfer) */
-int chippy_tx_verify(const chippy_tx *tx, const char *mint_pubkey);
+/* check sig: mint must match an authorized key; transfer must match from */
+int chippy_tx_verify(const chippy_tx *tx, const chippy_mint_keys *mint_keys);
+
+void chippy_mint_keys_init(chippy_mint_keys *keys);
+int chippy_mint_keys_add(chippy_mint_keys *keys, const char *addr_hex);
+int chippy_mint_keys_contains(const chippy_mint_keys *keys, const char *addr_hex);
+void chippy_mint_keys_copy(chippy_mint_keys *dst, const chippy_mint_keys *src);
 /* parse chain-file tx body: "mint - to amt sig" or "transfer from to amt sig" */
 int chippy_tx_parse_line(const char *line, chippy_tx *tx);
 /* format tx as a chain-file tx line (without leading "tx ") */
@@ -99,7 +110,7 @@ void chippy_chain_free(chippy_chain *chain);
 int chippy_block_compute_hash(const chippy_block *block, char *hash_out);
 /*
  * full validation: hash links, stored hashes, sigs, mint authority, non-negative balances.
- * chain must have mint_pubkey set.
+ * chain must have at least one authorized mint key loaded.
  */
 int chippy_chain_validate(const chippy_chain *chain);
 /* replay chain and return balance for addr_hex */
@@ -123,19 +134,19 @@ int chippy_dir_unlock(const char *dir);
 /* --- storage (.chippy/ data directory) --- */
 
 /*
- * create dir: config (mint_pubkey) + genesis block.
+ * create dir: config (authorized_mint_key) + genesis block.
  * generates a new mint keypair; only the pubkey is stored under dir.
  * optional out buffers receive mint address and secret hex (save secret off-server).
  * fails if dir already initialized.
  */
 int chippy_storage_init(const char *dir, char *mint_address_out, char *mint_secret_out);
-/* read mint_pubkey= from config */
-int chippy_storage_load_config(const char *dir, char *mint_pubkey_out);
+/* read authorized_mint_key= lines (and legacy mint_pubkey=) from config */
+int chippy_storage_load_mint_keys(const char *dir, chippy_mint_keys *keys_out);
+/* append authorized_mint_key= line if not already present */
+int chippy_storage_add_authorized_mint_key(const char *dir, const char *addr_hex);
 /* load config + parse chain file into chain (caller should chippy_chain_init first) */
 int chippy_storage_load_chain(const char *dir, chippy_chain *chain);
 /* append one block record to chain file */
 int chippy_storage_append_block(const char *dir, const chippy_block *block);
-/* read mint pubkey from config (same as load_config) */
-int chippy_storage_mint_pubkey(const char *dir, char *pub_out);
 
 #endif /* CHIPPY_H */
