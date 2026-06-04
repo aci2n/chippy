@@ -75,15 +75,15 @@ static void balance_map_free(balance_map *map)
   map->cap = 0;
 }
 
-static int apply_tx(balance_map *map, const chippy_tx *tx, const char *mint_pubkey)
+static int apply_tx(balance_map *map, const chippy_tx *tx, const chippy_mint_keys *mint_keys)
 {
   uint64_t from_bal;
   uint64_t to_bal;
 
-  if (map == NULL || tx == NULL || mint_pubkey == NULL) {
+  if (map == NULL || tx == NULL || mint_keys == NULL) {
     return -1;
   }
-  if (chippy_tx_verify(tx, mint_pubkey) != 0) {
+  if (chippy_tx_verify(tx, mint_keys) != 0) {
     return -1;
   }
   if (tx->type == CHIPPY_TX_MINT) {
@@ -113,15 +113,15 @@ static int apply_tx(balance_map *map, const chippy_tx *tx, const char *mint_pubk
   return 0;
 }
 
-static int apply_block(balance_map *map, const chippy_block *block, const char *mint_pubkey)
+static int apply_block(balance_map *map, const chippy_block *block, const chippy_mint_keys *mint_keys)
 {
   size_t i;
 
-  if (map == NULL || block == NULL || mint_pubkey == NULL) {
+  if (map == NULL || block == NULL || mint_keys == NULL) {
     return -1;
   }
   for (i = 0; i < block->tx_count; i++) {
-    if (apply_tx(map, &block->txs[i], mint_pubkey) != 0) {
+    if (apply_tx(map, &block->txs[i], mint_keys) != 0) {
       return -1;
     }
   }
@@ -192,7 +192,7 @@ void chippy_chain_init(chippy_chain *chain)
   chain->blocks = NULL;
   chain->block_count = 0;
   chain->block_cap = 0;
-  chain->mint_pubkey[0] = '\0';
+  chippy_mint_keys_init(&chain->mint_keys);
 }
 
 void chippy_chain_free(chippy_chain *chain)
@@ -211,7 +211,7 @@ void chippy_chain_free(chippy_chain *chain)
   chain->blocks = NULL;
   chain->block_count = 0;
   chain->block_cap = 0;
-  chain->mint_pubkey[0] = '\0';
+  chippy_mint_keys_init(&chain->mint_keys);
 }
 
 int chippy_block_compute_hash(const chippy_block *block, char *hash_out)
@@ -262,7 +262,7 @@ int chippy_chain_validate(const chippy_chain *chain)
   if (chain == NULL) {
     return -1;
   }
-  if (strlen(chain->mint_pubkey) != CHIPPY_HEX_PUB_LEN) {
+  if (chain->mint_keys.count == 0) {
     return -1;
   }
   if (chain->block_count == 0) {
@@ -282,7 +282,7 @@ int chippy_chain_validate(const chippy_chain *chain)
       balance_map_free(&map);
       return -1;
     }
-    if (apply_block(&map, &chain->blocks[i], chain->mint_pubkey) != 0) {
+    if (apply_block(&map, &chain->blocks[i], &chain->mint_keys) != 0) {
       balance_map_free(&map);
       return -1;
     }
@@ -301,7 +301,7 @@ int chippy_chain_balance(const chippy_chain *chain, const char *addr_hex, uint64
   }
   memset(&map, 0, sizeof(map));
   for (i = 0; i < chain->block_count; i++) {
-    if (apply_block(&map, &chain->blocks[i], chain->mint_pubkey) != 0) {
+    if (apply_block(&map, &chain->blocks[i], &chain->mint_keys) != 0) {
       balance_map_free(&map);
       return -1;
     }
@@ -324,9 +324,7 @@ int chippy_chain_append_block(chippy_chain *chain, chippy_block *block)
     return -1;
   }
   chippy_chain_init(&replay);
-  replay.mint_pubkey[0] = '\0';
-  strncpy(replay.mint_pubkey, chain->mint_pubkey, CHIPPY_HEX_PUB_LEN);
-  replay.mint_pubkey[CHIPPY_HEX_PUB_LEN] = '\0';
+  chippy_mint_keys_copy(&replay.mint_keys, &chain->mint_keys);
   for (i = 0; i < chain->block_count; i++) {
     if (chain_grow(&replay) != 0) {
       chippy_chain_free(&replay);

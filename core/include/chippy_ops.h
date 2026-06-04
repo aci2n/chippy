@@ -9,16 +9,23 @@
 
 #include <stdint.h>
 
-/* create .chippy data dir (mint keys, genesis) */
-int chippy_op_init(const char *dir);
-
-/* append signed mint tx (server signs with mint.sec) */
-int chippy_op_mint(const char *dir, const char *to_addr, uint64_t amount);
+/*
+ * create .chippy data dir (authorized_mint_key in config + genesis).
+ * generates a new mint keypair; writes only the pubkey to config.
+ * mint_address_out / mint_secret_out may be NULL; if set, receives hex strings.
+ */
+int chippy_op_init(const char *dir, char *mint_address_out, char *mint_secret_out);
 
 /*
- * append pre-signed transfer; tx must have from, to, amount, sig set.
- * verifies signature before append.
+ * append a signed tx (mint or transfer). verifies signature then persists.
+ * mint: type MINT, to, amount, sig (from empty). transfer: from, to, amount, sig.
  */
+int chippy_op_submit_tx(const char *dir, const chippy_tx *tx);
+
+/* append pre-signed mint */
+int chippy_op_mint(const char *dir, const chippy_tx *tx);
+
+/* append pre-signed transfer */
 int chippy_op_transfer(const char *dir, const chippy_tx *tx);
 
 /* replay chain for addr balance */
@@ -29,14 +36,15 @@ int chippy_op_validate(const char *dir);
 
 /* client-side helpers (no data dir; no lock) */
 
-/* write address and secret hex strings into caller buffers */
 int chippy_op_keygen(char *addr_out, char *secret_hex_out);
 
-/*
- * sign transfer; secret must match from_addr.
- * writes sig hex into sig_out (CHIPPY_HEX_SIG_LEN + 1).
- */
 int chippy_op_sign_transfer(const char *secret_hex, const char *from_addr, const char *to_addr,
                             uint64_t amount, char *sig_out);
+
+/*
+ * sign mint; mint_secret must match mint_address (mint authority pubkey hex).
+ */
+int chippy_op_sign_mint(const char *mint_secret_hex, const char *mint_address,
+                        const char *to_addr, uint64_t amount, char *sig_out);
 
 #endif /* CHIPPY_OPS_H */

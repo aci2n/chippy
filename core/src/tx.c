@@ -44,14 +44,14 @@ int chippy_tx_sign(chippy_tx *tx, const unsigned char *sk)
   return chippy_hex_encode(sig, sizeof(sig), tx->sig, sizeof(tx->sig));
 }
 
-int chippy_tx_verify(const chippy_tx *tx, const char *mint_pubkey)
+int chippy_tx_verify(const chippy_tx *tx, const chippy_mint_keys *mint_keys)
 {
   unsigned char payload[512];
   unsigned char sig[crypto_sign_BYTES];
   size_t payload_len;
-  const char *signer;
+  size_t i;
 
-  if (tx == NULL || mint_pubkey == NULL) {
+  if (tx == NULL || mint_keys == NULL) {
     return -1;
   }
   if (chippy_tx_sign_payload(tx, payload, sizeof(payload), &payload_len) != 0) {
@@ -64,14 +64,20 @@ int chippy_tx_verify(const chippy_tx *tx, const char *mint_pubkey)
     return -1;
   }
   if (tx->type == CHIPPY_TX_MINT) {
-    signer = mint_pubkey;
-  } else {
-    if (strlen(tx->from) != CHIPPY_HEX_ADDR_LEN) {
+    if (mint_keys->count == 0) {
       return -1;
     }
-    signer = tx->from;
+    for (i = 0; i < mint_keys->count; i++) {
+      if (chippy_verify(mint_keys->keys[i], payload, payload_len, sig) == 0) {
+        return 0;
+      }
+    }
+    return -1;
   }
-  return chippy_verify(signer, payload, payload_len, sig);
+  if (strlen(tx->from) != CHIPPY_HEX_ADDR_LEN) {
+    return -1;
+  }
+  return chippy_verify(tx->from, payload, payload_len, sig);
 }
 
 int chippy_tx_parse_line(const char *line, chippy_tx *tx)

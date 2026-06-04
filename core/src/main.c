@@ -1,4 +1,5 @@
 #include "chippy_ops.h"
+#include "chippy.h"
 
 #include <sodium.h>
 #include <stdio.h>
@@ -13,12 +14,14 @@ static void usage(const char *prog)
           "usage:\n"
           "  %s init [--dir .chippy]\n"
           "  %s keygen\n"
+          "  %s sign-mint <mint_secret> <mint_address> <to> <amount>\n"
           "  %s sign-transfer <secret_hex> <from> <to> <amount>\n"
+          "  %s mint <to> <amount> <sig_hex> [--dir .chippy]\n"
           "  %s transfer <from> <to> <amount> <sig_hex> [--dir .chippy]\n"
-          "  %s mint <to_addr> <amount> [--dir .chippy]\n"
           "  %s balance <addr> [--dir .chippy]\n"
+          "  %s mint-key add <mint_address> [--dir .chippy]\n"
           "  %s validate [--dir .chippy]\n",
-          prog, prog, prog, prog, prog, prog, prog);
+          prog, prog, prog, prog, prog, prog, prog, prog, prog);
 }
 
 static void parse_global_dir(int argc, char **argv)
@@ -35,13 +38,17 @@ static void parse_global_dir(int argc, char **argv)
 
 static int cmd_init(int argc, char **argv)
 {
+  char mint_addr[CHIPPY_HEX_ADDR_LEN + 1];
+  char mint_sec[CHIPPY_HEX_SEC_LEN + 1];
+
   (void)argc;
   (void)argv;
-  if (chippy_op_init(data_dir) != 0) {
+  if (chippy_op_init(data_dir, mint_addr, mint_sec) != 0) {
     fprintf(stderr, "init failed\n");
     return 1;
   }
   printf("initialized data dir: %s\n", data_dir);
+  printf("mint_address=%s\nmint_secret=%s\n", mint_addr, mint_sec);
   return 0;
 }
 
@@ -55,6 +62,23 @@ static int cmd_keygen(void)
     return 1;
   }
   printf("address=%s\nsecret=%s\n", addr, sec);
+  return 0;
+}
+
+static int cmd_sign_mint(int argc, char **argv)
+{
+  char sig[CHIPPY_HEX_SIG_LEN + 1];
+  unsigned long long amount;
+
+  if (argc < 6) {
+    return -1;
+  }
+  amount = strtoull(argv[5], NULL, 10);
+  if (chippy_op_sign_mint(argv[2], argv[3], argv[4], (uint64_t)amount, sig) != 0) {
+    fprintf(stderr, "sign-mint failed\n");
+    return 1;
+  }
+  printf("%s\n", sig);
   return 0;
 }
 
@@ -72,6 +96,39 @@ static int cmd_sign_transfer(int argc, char **argv)
     return 1;
   }
   printf("%s\n", sig);
+  return 0;
+}
+
+static int cmd_mint(int argc, char **argv)
+{
+  chippy_tx tx;
+  unsigned long long amount;
+
+  if (argc < 5) {
+    return -1;
+  }
+  if (strlen(argv[2]) != CHIPPY_HEX_ADDR_LEN) {
+    fprintf(stderr, "invalid address\n");
+    return 1;
+  }
+  if (strlen(argv[4]) != CHIPPY_HEX_SIG_LEN) {
+    fprintf(stderr, "invalid signature\n");
+    return 1;
+  }
+  amount = strtoull(argv[3], NULL, 10);
+  memset(&tx, 0, sizeof(tx));
+  tx.type = CHIPPY_TX_MINT;
+  tx.from[0] = '\0';
+  strncpy(tx.to, argv[2], CHIPPY_HEX_ADDR_LEN);
+  tx.to[CHIPPY_HEX_ADDR_LEN] = '\0';
+  tx.amount = (uint64_t)amount;
+  strncpy(tx.sig, argv[4], CHIPPY_HEX_SIG_LEN);
+  tx.sig[CHIPPY_HEX_SIG_LEN] = '\0';
+  if (chippy_op_mint(data_dir, &tx) != 0) {
+    fprintf(stderr, "mint failed\n");
+    return 1;
+  }
+  printf("minted %llu to %s\n", (unsigned long long)amount, argv[2]);
   return 0;
 }
 
@@ -105,26 +162,6 @@ static int cmd_transfer(int argc, char **argv)
   return 0;
 }
 
-static int cmd_mint(int argc, char **argv)
-{
-  unsigned long long amount;
-
-  if (argc < 4) {
-    return -1;
-  }
-  if (strlen(argv[2]) != CHIPPY_HEX_ADDR_LEN) {
-    fprintf(stderr, "invalid address\n");
-    return 1;
-  }
-  amount = strtoull(argv[3], NULL, 10);
-  if (chippy_op_mint(data_dir, argv[2], (uint64_t)amount) != 0) {
-    fprintf(stderr, "mint failed\n");
-    return 1;
-  }
-  printf("minted %llu to %s\n", (unsigned long long)amount, argv[2]);
-  return 0;
-}
-
 static int cmd_balance(int argc, char **argv)
 {
   uint64_t balance;
@@ -141,6 +178,29 @@ static int cmd_balance(int argc, char **argv)
     return 1;
   }
   printf("%llu\n", (unsigned long long)balance);
+  return 0;
+}
+
+static int cmd_mint_key_add(int argc, char **argv)
+{
+  if (argc < 3) {
+    return -1;
+  }
+  if (strlen(argv[2]) != CHIPPY_HEX_ADDR_LEN) {
+    fprintf(stderr, "invalid mint address\n");
+    return 1;
+  }
+  if (chippy_dir_lock(data_dir) != 0) {
+    fprintf(stderr, "data dir in use\n");
+    return 1;
+  }
+  if (chippy_storage_add_authorized_mint_key(data_dir, argv[2]) != 0) {
+    chippy_dir_unlock(data_dir);
+    fprintf(stderr, "mint-key add failed\n");
+    return 1;
+  }
+  chippy_dir_unlock(data_dir);
+  printf("authorized mint key %s\n", argv[2]);
   return 0;
 }
 
@@ -175,14 +235,18 @@ int main(int argc, char **argv)
     rc = cmd_init(argc, argv);
   } else if (strcmp(argv[1], "keygen") == 0) {
     rc = cmd_keygen();
+  } else if (strcmp(argv[1], "sign-mint") == 0) {
+    rc = cmd_sign_mint(argc, argv);
   } else if (strcmp(argv[1], "sign-transfer") == 0) {
     rc = cmd_sign_transfer(argc, argv);
-  } else if (strcmp(argv[1], "transfer") == 0) {
-    rc = cmd_transfer(argc, argv);
   } else if (strcmp(argv[1], "mint") == 0) {
     rc = cmd_mint(argc, argv);
+  } else if (strcmp(argv[1], "transfer") == 0) {
+    rc = cmd_transfer(argc, argv);
   } else if (strcmp(argv[1], "balance") == 0) {
     rc = cmd_balance(argc, argv);
+  } else if (strcmp(argv[1], "mint-key") == 0 && argc >= 3 && strcmp(argv[2], "add") == 0) {
+    rc = cmd_mint_key_add(argc, argv);
   } else if (strcmp(argv[1], "validate") == 0) {
     rc = cmd_validate(argc, argv);
   } else {

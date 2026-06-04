@@ -148,6 +148,8 @@ static void test_chain_flow(char *dir)
 {
   chippy_chain chain;
   chippy_tx tx;
+  char mint_addr[CHIPPY_HEX_ADDR_LEN + 1];
+  char mint_sec_hex[CHIPPY_HEX_SEC_LEN + 1];
   unsigned char mint_sk[crypto_sign_SECRETKEYBYTES];
   unsigned char alice_pk[crypto_sign_PUBLICKEYBYTES];
   unsigned char alice_sk[crypto_sign_SECRETKEYBYTES];
@@ -158,10 +160,12 @@ static void test_chain_flow(char *dir)
   uint64_t balance;
 
   chippy_chain_init(&chain);
-  ASSERT(chippy_storage_init(dir) == 0, "storage init");
+  ASSERT(chippy_storage_init(dir, mint_addr, mint_sec_hex) == 0, "storage init");
+  ASSERT(chippy_hex_decode(mint_sec_hex, mint_sk, sizeof(mint_sk)) ==
+             (int)crypto_sign_SECRETKEYBYTES,
+         "mint secret from init");
   ASSERT(chippy_storage_load_chain(dir, &chain) == 0, "load genesis");
   ASSERT(chippy_chain_validate(&chain) == 0, "genesis validates");
-  ASSERT(chippy_storage_mint_load_sec(dir, mint_sk) == 0, "load mint key");
 
   ASSERT(chippy_keypair_generate(alice_pk, alice_sk) == 0, "alice keypair");
   ASSERT(chippy_pubkey_to_address(alice_pk, alice_addr) == 0, "alice address");
@@ -207,6 +211,8 @@ static void test_chain_flow(char *dir)
 static void test_ops_flow(char *dir)
 {
   chippy_tx tx;
+  char mint_addr[CHIPPY_HEX_ADDR_LEN + 1];
+  char mint_sec[CHIPPY_HEX_SEC_LEN + 1];
   char alice_addr[CHIPPY_HEX_ADDR_LEN + 1];
   char alice_sec[CHIPPY_HEX_SEC_LEN + 1];
   char bob_addr[CHIPPY_HEX_ADDR_LEN + 1];
@@ -214,11 +220,18 @@ static void test_ops_flow(char *dir)
   char sig[CHIPPY_HEX_SIG_LEN + 1];
   uint64_t balance;
 
-  ASSERT(chippy_op_init(dir) == 0, "op init");
+  ASSERT(chippy_op_init(dir, mint_addr, mint_sec) == 0, "op init");
   ASSERT(chippy_op_keygen(alice_addr, alice_sec) == 0, "op keygen alice");
   ASSERT(chippy_op_keygen(bob_addr, bob_sec) == 0, "op keygen bob");
   (void)bob_sec;
-  ASSERT(chippy_op_mint(dir, alice_addr, 1000) == 0, "op mint");
+  ASSERT(chippy_op_sign_mint(mint_sec, mint_addr, alice_addr, 1000, sig) == 0, "op sign mint");
+  memset(&tx, 0, sizeof(tx));
+  tx.type = CHIPPY_TX_MINT;
+  tx.from[0] = '\0';
+  strncpy(tx.to, alice_addr, CHIPPY_HEX_ADDR_LEN);
+  tx.amount = 1000;
+  strncpy(tx.sig, sig, CHIPPY_HEX_SIG_LEN);
+  ASSERT(chippy_op_submit_tx(dir, &tx) == 0, "op submit mint");
   ASSERT(chippy_op_balance(dir, alice_addr, &balance) == 0, "op balance alice");
   ASSERT(balance == 1000, "op alice has 1000");
   ASSERT(chippy_op_sign_transfer(alice_sec, alice_addr, bob_addr, 250, sig) == 0,
@@ -237,11 +250,49 @@ static void test_ops_flow(char *dir)
   ASSERT(chippy_op_validate(dir) == 0, "op validate");
 }
 
+static void test_authorized_mint_keys(char *dir)
+{
+  chippy_mint_keys keys;
+  chippy_tx tx;
+  char mint_a[CHIPPY_HEX_ADDR_LEN + 1];
+  char mint_a_sec[CHIPPY_HEX_SEC_LEN + 1];
+  char mint_b[CHIPPY_HEX_ADDR_LEN + 1];
+  char mint_b_sec[CHIPPY_HEX_SEC_LEN + 1];
+  char alice[CHIPPY_HEX_ADDR_LEN + 1];
+  char alice_sec[CHIPPY_HEX_SEC_LEN + 1];
+  char sig[CHIPPY_HEX_SIG_LEN + 1];
+  uint64_t balance;
+
+  ASSERT(chippy_op_init(dir, mint_a, mint_a_sec) == 0, "init for mint keys test");
+  ASSERT(chippy_op_keygen(mint_b, mint_b_sec) == 0, "second mint key");
+  ASSERT(chippy_storage_add_authorized_mint_key(dir, mint_b) == 0, "authorize mint b");
+  ASSERT(chippy_storage_load_mint_keys(dir, &keys) == 0, "load mint keys");
+  ASSERT(keys.count == 2, "two authorized mint keys");
+  ASSERT(chippy_mint_keys_contains(&keys, mint_a) != 0, "mint a authorized");
+  ASSERT(chippy_mint_keys_contains(&keys, mint_b) != 0, "mint b authorized");
+  ASSERT(chippy_op_keygen(alice, alice_sec) == 0, "alice recipient");
+  (void)alice_sec;
+  ASSERT(chippy_op_sign_mint(mint_a_sec, mint_b, alice, 50, sig) != 0,
+         "reject mint secret/address mismatch");
+  memset(&tx, 0, sizeof(tx));
+  tx.type = CHIPPY_TX_MINT;
+  tx.from[0] = '\0';
+  strncpy(tx.to, alice, CHIPPY_HEX_ADDR_LEN);
+  tx.amount = 50;
+  ASSERT(chippy_op_sign_mint(mint_b_sec, mint_b, alice, 50, sig) == 0, "sign mint as b");
+  strncpy(tx.sig, sig, CHIPPY_HEX_SIG_LEN);
+  ASSERT(chippy_op_submit_tx(dir, &tx) == 0, "submit mint from key b");
+  ASSERT(chippy_op_balance(dir, alice, &balance) == 0, "alice balance");
+  ASSERT(balance == 50, "mint from second key");
+}
+
 static void test_storage_roundtrip(void)
 {
   chippy_chain chain;
   chippy_tx tx;
   chippy_block saved;
+  char mint_addr[CHIPPY_HEX_ADDR_LEN + 1];
+  char mint_sec_hex[CHIPPY_HEX_SEC_LEN + 1];
   unsigned char mint_sk[crypto_sign_SECRETKEYBYTES];
   unsigned char pk[crypto_sign_PUBLICKEYBYTES];
   unsigned char sk[crypto_sign_SECRETKEYBYTES];
@@ -256,9 +307,11 @@ static void test_storage_roundtrip(void)
   }
 
   chippy_chain_init(&chain);
-  ASSERT(chippy_storage_init(dir) == 0, "storage init roundtrip dir");
+  ASSERT(chippy_storage_init(dir, mint_addr, mint_sec_hex) == 0, "storage init roundtrip dir");
+  ASSERT(chippy_hex_decode(mint_sec_hex, mint_sk, sizeof(mint_sk)) ==
+             (int)crypto_sign_SECRETKEYBYTES,
+         "mint secret roundtrip");
   ASSERT(chippy_storage_load_chain(dir, &chain) == 0, "load genesis for roundtrip");
-  ASSERT(chippy_storage_mint_load_sec(dir, mint_sk) == 0, "mint key for roundtrip");
   ASSERT(chippy_keypair_generate(pk, sk) == 0, "recipient keypair");
   ASSERT(chippy_pubkey_to_address(pk, addr) == 0, "recipient address");
 
@@ -312,6 +365,15 @@ int main(void)
     test_ops_flow(dir);
     free(dir);
   }
+
+  dir = make_temp_dir();
+  if (dir == NULL) {
+    fail("temp dir authorized mint keys");
+  } else {
+    test_authorized_mint_keys(dir);
+    free(dir);
+  }
+
   test_storage_roundtrip();
 
   if (failures > 0) {

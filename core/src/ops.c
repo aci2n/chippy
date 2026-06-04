@@ -52,7 +52,7 @@ static int append_tx_block(const char *dir, chippy_chain *chain, const chippy_tx
   return 0;
 }
 
-int chippy_op_init(const char *dir)
+int chippy_op_init(const char *dir, char *mint_address_out, char *mint_secret_out)
 {
   if (dir == NULL) {
     return -1;
@@ -60,55 +60,14 @@ int chippy_op_init(const char *dir)
   if (chippy_dir_lock(dir) != 0) {
     return -1;
   }
-  if (chippy_storage_init(dir) != 0) {
+  if (chippy_storage_init(dir, mint_address_out, mint_secret_out) != 0) {
     chippy_dir_unlock(dir);
     return -1;
   }
   return chippy_dir_unlock(dir);
 }
 
-int chippy_op_mint(const char *dir, const char *to_addr, uint64_t amount)
-{
-  chippy_chain chain;
-  chippy_tx tx;
-  unsigned char sk[crypto_sign_SECRETKEYBYTES];
-  int rc;
-
-  if (dir == NULL || !address_valid(to_addr)) {
-    return -1;
-  }
-  if (chippy_dir_lock(dir) != 0) {
-    return -1;
-  }
-  rc = -1;
-  chippy_chain_init(&chain);
-  if (chippy_storage_load_chain(dir, &chain) != 0) {
-    goto done;
-  }
-  if (chippy_storage_mint_load_sec(dir, sk) != 0) {
-    goto done;
-  }
-  memset(&tx, 0, sizeof(tx));
-  tx.type = CHIPPY_TX_MINT;
-  strncpy(tx.to, to_addr, CHIPPY_HEX_ADDR_LEN);
-  tx.to[CHIPPY_HEX_ADDR_LEN] = '\0';
-  tx.amount = amount;
-  if (chippy_tx_sign(&tx, sk) != 0) {
-    goto done;
-  }
-  if (append_tx_block(dir, &chain, &tx) != 0) {
-    goto done;
-  }
-  rc = 0;
-done:
-  chippy_chain_free(&chain);
-  if (chippy_dir_unlock(dir) != 0) {
-    return -1;
-  }
-  return rc;
-}
-
-int chippy_op_transfer(const char *dir, const chippy_tx *tx)
+int chippy_op_submit_tx(const char *dir, const chippy_tx *tx)
 {
   chippy_chain chain;
   chippy_tx copy;
@@ -117,13 +76,18 @@ int chippy_op_transfer(const char *dir, const chippy_tx *tx)
   if (dir == NULL || tx == NULL) {
     return -1;
   }
-  if (tx->type != CHIPPY_TX_TRANSFER) {
-    return -1;
-  }
-  if (!address_valid(tx->from) || !address_valid(tx->to)) {
-    return -1;
-  }
   if (strlen(tx->sig) != CHIPPY_HEX_SIG_LEN) {
+    return -1;
+  }
+  if (tx->type == CHIPPY_TX_MINT) {
+    if (!address_valid(tx->to) || tx->from[0] != '\0') {
+      return -1;
+    }
+  } else if (tx->type == CHIPPY_TX_TRANSFER) {
+    if (!address_valid(tx->from) || !address_valid(tx->to)) {
+      return -1;
+    }
+  } else {
     return -1;
   }
   if (chippy_dir_lock(dir) != 0) {
@@ -135,7 +99,7 @@ int chippy_op_transfer(const char *dir, const chippy_tx *tx)
     goto done;
   }
   copy = *tx;
-  if (chippy_tx_verify(&copy, chain.mint_pubkey) != 0) {
+  if (chippy_tx_verify(&copy, &chain.mint_keys) != 0) {
     goto done;
   }
   if (append_tx_block(dir, &chain, &copy) != 0) {
@@ -148,6 +112,22 @@ done:
     return -1;
   }
   return rc;
+}
+
+int chippy_op_mint(const char *dir, const chippy_tx *tx)
+{
+  if (tx == NULL || tx->type != CHIPPY_TX_MINT) {
+    return -1;
+  }
+  return chippy_op_submit_tx(dir, tx);
+}
+
+int chippy_op_transfer(const char *dir, const chippy_tx *tx)
+{
+  if (tx == NULL || tx->type != CHIPPY_TX_TRANSFER) {
+    return -1;
+  }
+  return chippy_op_submit_tx(dir, tx);
 }
 
 int chippy_op_balance(const char *dir, const char *addr_hex, uint64_t *balance_out)
@@ -256,6 +236,49 @@ int chippy_op_sign_transfer(const char *secret_hex, const char *from_addr, const
   tx.type = CHIPPY_TX_TRANSFER;
   strncpy(tx.from, from_addr, CHIPPY_HEX_ADDR_LEN);
   tx.from[CHIPPY_HEX_ADDR_LEN] = '\0';
+  strncpy(tx.to, to_addr, CHIPPY_HEX_ADDR_LEN);
+  tx.to[CHIPPY_HEX_ADDR_LEN] = '\0';
+  tx.amount = amount;
+  if (chippy_tx_sign(&tx, sk) != 0) {
+    return -1;
+  }
+  strncpy(sig_out, tx.sig, CHIPPY_HEX_SIG_LEN);
+  sig_out[CHIPPY_HEX_SIG_LEN] = '\0';
+  return 0;
+}
+
+int chippy_op_sign_mint(const char *mint_secret_hex, const char *mint_address,
+                        const char *to_addr, uint64_t amount, char *sig_out)
+{
+  chippy_tx tx;
+  unsigned char sk[crypto_sign_SECRETKEYBYTES];
+  unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+  char derived[CHIPPY_HEX_ADDR_LEN + 1];
+  int n;
+
+  if (mint_secret_hex == NULL || mint_address == NULL || to_addr == NULL || sig_out == NULL) {
+    return -1;
+  }
+  if (!address_valid(mint_address) || !address_valid(to_addr)) {
+    return -1;
+  }
+  if (strlen(mint_secret_hex) != CHIPPY_HEX_SEC_LEN) {
+    return -1;
+  }
+  n = chippy_hex_decode(mint_secret_hex, sk, sizeof(sk));
+  if (n != (int)crypto_sign_SECRETKEYBYTES) {
+    return -1;
+  }
+  crypto_sign_ed25519_sk_to_pk(pk, sk);
+  if (chippy_pubkey_to_address(pk, derived) != 0) {
+    return -1;
+  }
+  if (!chippy_str_eq(derived, mint_address)) {
+    return -1;
+  }
+  memset(&tx, 0, sizeof(tx));
+  tx.type = CHIPPY_TX_MINT;
+  tx.from[0] = '\0';
   strncpy(tx.to, to_addr, CHIPPY_HEX_ADDR_LEN);
   tx.to[CHIPPY_HEX_ADDR_LEN] = '\0';
   tx.amount = amount;
