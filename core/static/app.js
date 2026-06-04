@@ -1,12 +1,7 @@
 (function () {
-  var api = window.CHIPPY_API_URL;
-  if (!api) {
-    document.getElementById("health").textContent = "Missing CHIPPY_API_URL";
-    document.getElementById("health").className = "status err";
-    return;
-  }
+  var api = typeof window.CHIPPY_API_URL === "string" ? window.CHIPPY_API_URL : "";
 
-  document.getElementById("api-url").textContent = api;
+  document.getElementById("api-url").textContent = api || "(this server)";
 
   function setMsg(id, text, ok) {
     var el = document.getElementById(id);

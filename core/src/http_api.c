@@ -1,4 +1,4 @@
-#include "api.h"
+#include "http_api.h"
 
 #include "chippy_ops.h"
 #include "json_util.h"
@@ -39,11 +39,12 @@ static int path_prefix(const char *path, size_t path_len, const char *prefix, si
 static void resp_json(struct http_response *resp, int status, const char *json)
 {
   resp->status = status;
+  snprintf(resp->content_type, sizeof(resp->content_type), "application/json");
   snprintf(resp->body, sizeof(resp->body), "%s", json);
 }
 
-void api_handle(struct api_ctx *ctx, const char *method, size_t method_len, const char *path,
-                size_t path_len, const char *body, size_t body_len, struct http_response *resp)
+void http_api_handle(struct api_ctx *ctx, const char *method, size_t method_len, const char *path,
+                     size_t path_len, const char *body, size_t body_len, struct http_response *resp)
 {
   size_t off;
   char addr[CHIPPY_HEX_ADDR_LEN + 1];
@@ -57,6 +58,7 @@ void api_handle(struct api_ctx *ctx, const char *method, size_t method_len, cons
 
   (void)body_len;
   memset(resp, 0, sizeof(*resp));
+  snprintf(resp->content_type, sizeof(resp->content_type), "application/json");
   resp_json(resp, 404, "{\"error\":\"not found\"}");
 
   if (path_eq(path, path_len, "/health")) {
