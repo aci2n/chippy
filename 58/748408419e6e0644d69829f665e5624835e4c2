@@ -1,0 +1,32 @@
+core/tests/test_core.c
+  s_9dbf29db24a4c7::t_78f8c5c9ab1135 285
+  s_9dbf29db24a4c7::t_12aeccd857a24d 103-110
+core/include/chippy.h
+  s_9dbf29db24a4c7::t_c449b75932277a 111-120
+core/src/main.c
+  s_9dbf29db24a4c7::t_bdbd5eb948eb86 284-286,289,295,300
+  s_9dbf29db24a4c7::t_3bbbd63128d9ef 151-153,157,161,170,174,177,180-183
+  s_9dbf29db24a4c7::t_239cd6121b3c64 257-259,262,268,273
+  s_9dbf29db24a4c7::t_a9c0d740501c23 11-19
+  s_9dbf29db24a4c7::t_7afe619760db81 49-51,53,57
+  s_9dbf29db24a4c7::t_0ea7a4cc60ce2a 203-205,209,213,218,229,233,236,239-242
+  s_9dbf29db24a4c7::t_646762e23ea57f 69-71,73,77
+core/Makefile.am
+  s_9dbf29db24a4c7::t_405b9dd908e2b3 9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "58748408419e6e0644d69829f665e5624835e4c2",
+  "prompts": {},
+  "sessions": {
+    "s_9dbf29db24a4c7": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "dd0d1440-af67-464a-9a13-8afe598dfa64",
+        "model": "composer-2.5"
+      },
+      "human_author": "aci2n <alvarocalace@hotmail.com>"
+    }
+  }
+}
