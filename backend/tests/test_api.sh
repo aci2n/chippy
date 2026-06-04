@@ -1,5 +1,5 @@
 #!/bin/sh
-# integration test for backend REST API (mint via CLI only)
+# integration test for backend REST API (client-signed mint and transfer)
 set -e
 
 BACKEND="${CHIPPY_BACKEND:-./backend}"
@@ -10,14 +10,17 @@ BASE="http://127.0.0.1:${PORT}"
 
 trap 'kill $PID 2>/dev/null; rm -rf "$DIR"' EXIT
 
-"$CHIPPY" init --dir "$DIR"
+INIT=$("$CHIPPY" init --dir "$DIR")
+MINT_ADDR=$(echo "$INIT" | sed -n 's/^mint_address=//p')
+MINT_SK=$(echo "$INIT" | sed -n 's/^mint_secret=//p')
 
 ALICE_KEYS=$("$CHIPPY" keygen)
 ALICE=$(echo "$ALICE_KEYS" | sed -n 's/^address=//p')
 ALICE_SK=$(echo "$ALICE_KEYS" | sed -n 's/^secret=//p')
 BOB=$("$CHIPPY" keygen | sed -n 's/^address=//p')
 
-"$CHIPPY" mint "$ALICE" 1000 --dir "$DIR"
+MINT_SIG=$("$CHIPPY" sign-mint "$MINT_SK" "$MINT_ADDR" "$ALICE" 1000)
+"$CHIPPY" mint "$ALICE" 1000 "$MINT_SIG" --dir "$DIR"
 
 "$BACKEND" --dir "$DIR" --listen "127.0.0.1:${PORT}" &
 PID=$!

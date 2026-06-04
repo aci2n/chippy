@@ -98,7 +98,7 @@ Run the API server:
 ./backend/backend --dir /tmp/.chippy --listen 127.0.0.1:8080
 ```
 
-Minting is **CLI only** (`chippy mint`); the HTTP API exposes balance, validate, and signed transfer.
+Mint authority secret is **not** stored on the server (only `mint_pubkey` in `config`). Mint and transfer are client-signed; HTTP accepts `POST /api/v1/mint` and `POST /api/v1/transfer` with signatures.
 
 ### `web/`
 

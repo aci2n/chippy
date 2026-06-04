@@ -130,4 +130,30 @@ void api_handle(struct api_ctx *ctx, const char *method, size_t method_len, cons
     resp_json(resp, 200, "{\"ok\":true}");
     return;
   }
+
+  if (path_eq(path, path_len, API_PREFIX "/mint")) {
+    if (method_len != 4 || memcmp(method, "POST", 4) != 0) {
+      return;
+    }
+    if (body == NULL || json_get_string(body, "to", to, sizeof(to)) != 0 ||
+        json_get_string(body, "sig", sig, sizeof(sig)) != 0 ||
+        json_get_u64(body, "amount", &amount) != 0) {
+      resp_json(resp, 400, "{\"error\":\"invalid json body\"}");
+      return;
+    }
+    memset(&tx, 0, sizeof(tx));
+    tx.type = CHIPPY_TX_MINT;
+    tx.from[0] = '\0';
+    strncpy(tx.to, to, CHIPPY_HEX_ADDR_LEN);
+    tx.to[CHIPPY_HEX_ADDR_LEN] = '\0';
+    tx.amount = amount;
+    strncpy(tx.sig, sig, CHIPPY_HEX_SIG_LEN);
+    rc = chippy_op_submit_tx(ctx->data_dir, &tx);
+    if (rc != 0) {
+      resp_json(resp, 409, "{\"error\":\"mint rejected\"}");
+      return;
+    }
+    resp_json(resp, 200, "{\"ok\":true}");
+    return;
+  }
 }

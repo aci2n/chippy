@@ -51,60 +51,6 @@ static int path_join(char *out, size_t out_cap, const char *dir, const char *nam
   return 0;
 }
 
-static int write_keypair_files(const char *pub_path, const char *sec_path,
-                               const unsigned char *pk, const unsigned char *sk)
-{
-  char hex[CHIPPY_HEX_SEC_LEN + 1];
-  FILE *f;
-
-  if (chippy_hex_encode(pk, crypto_sign_PUBLICKEYBYTES, hex, sizeof(hex)) != 0) {
-    return -1;
-  }
-  f = fopen(pub_path, "w");
-  if (f == NULL) {
-    return -1;
-  }
-  fprintf(f, "%s\n", hex);
-  fclose(f);
-
-  if (chippy_hex_encode(sk, crypto_sign_SECRETKEYBYTES, hex, sizeof(hex)) != 0) {
-    return -1;
-  }
-  f = fopen(sec_path, "w");
-  if (f == NULL) {
-    return -1;
-  }
-  fprintf(f, "%s\n", hex);
-  fclose(f);
-  return 0;
-}
-
-static int read_hex_file(const char *path, unsigned char *buf, size_t buf_len, size_t expect_hex)
-{
-  char hex[CHIPPY_HEX_SEC_LEN + 1];
-  FILE *f;
-  int n;
-
-  f = fopen(path, "r");
-  if (f == NULL) {
-    return -1;
-  }
-  if (fgets(hex, (int)sizeof(hex), f) == NULL) {
-    fclose(f);
-    return -1;
-  }
-  fclose(f);
-  hex[strcspn(hex, "\r\n")] = '\0';
-  if (strlen(hex) != expect_hex) {
-    return -1;
-  }
-  n = chippy_hex_decode(hex, buf, buf_len);
-  if (n < 0) {
-    return -1;
-  }
-  return n;
-}
-
 static int chain_grow_blocks(chippy_chain *chain)
 {
   chippy_block *new_blocks;
@@ -132,12 +78,11 @@ static int push_block(chippy_chain *chain, chippy_block *block)
   return 0;
 }
 
-int chippy_storage_init(const char *dir)
+int chippy_storage_init(const char *dir, char *mint_address_out, char *mint_secret_out)
 {
   char config_path[CHIPPY_MAX_PATH];
-  char pub_path[CHIPPY_MAX_PATH];
-  char sec_path[CHIPPY_MAX_PATH];
   char chain_path[CHIPPY_MAX_PATH];
+  char mint_addr[CHIPPY_HEX_ADDR_LEN + 1];
   unsigned char pk[crypto_sign_PUBLICKEYBYTES];
   unsigned char sk[crypto_sign_SECRETKEYBYTES];
   chippy_block genesis;
@@ -154,14 +99,17 @@ int chippy_storage_init(const char *dir)
   if (chippy_keypair_generate(pk, sk) != 0) {
     return -1;
   }
-  if (path_join(pub_path, sizeof(pub_path), dir, "mint.pub") != 0) {
+  if (chippy_pubkey_to_address(pk, mint_addr) != 0) {
     return -1;
   }
-  if (path_join(sec_path, sizeof(sec_path), dir, "mint.sec") != 0) {
-    return -1;
+  if (mint_address_out != NULL) {
+    strncpy(mint_address_out, mint_addr, CHIPPY_HEX_ADDR_LEN);
+    mint_address_out[CHIPPY_HEX_ADDR_LEN] = '\0';
   }
-  if (write_keypair_files(pub_path, sec_path, pk, sk) != 0) {
-    return -1;
+  if (mint_secret_out != NULL) {
+    if (chippy_hex_encode(sk, sizeof(sk), mint_secret_out, CHIPPY_HEX_SEC_LEN + 1) != 0) {
+      return -1;
+    }
   }
 
   if (path_join(config_path, sizeof(config_path), dir, "config") != 0) {
@@ -171,11 +119,7 @@ int chippy_storage_init(const char *dir)
   if (f == NULL) {
     return -1;
   }
-  if (chippy_pubkey_to_address(pk, genesis.hash) != 0) {
-    fclose(f);
-    return -1;
-  }
-  fprintf(f, "mint_pubkey=%s\n", genesis.hash);
+  fprintf(f, "mint_pubkey=%s\n", mint_addr);
   fclose(f);
 
   memset(&genesis, 0, sizeof(genesis));
@@ -413,23 +357,6 @@ int chippy_storage_append_block(const char *dir, const chippy_block *block)
   fprintf(f, "hash %s\n", block->hash);
   fprintf(f, "\n");
   fclose(f);
-  return 0;
-}
-
-int chippy_storage_mint_load_sec(const char *dir, unsigned char *sk_out)
-{
-  char path[CHIPPY_MAX_PATH];
-
-  if (dir == NULL || sk_out == NULL) {
-    return -1;
-  }
-  if (path_join(path, sizeof(path), dir, "mint.sec") != 0) {
-    return -1;
-  }
-  if (read_hex_file(path, sk_out, crypto_sign_SECRETKEYBYTES, CHIPPY_HEX_SEC_LEN) !=
-      (int)crypto_sign_SECRETKEYBYTES) {
-    return -1;
-  }
   return 0;
 }
 

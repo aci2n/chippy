@@ -123,19 +123,18 @@ int chippy_dir_unlock(const char *dir);
 /* --- storage (.chippy/ data directory) --- */
 
 /*
- * create dir: mint keys, config (mint_pubkey), genesis block in chain.
- * does not store user wallets (client-side keys only).
+ * create dir: config (mint_pubkey) + genesis block.
+ * generates a new mint keypair; only the pubkey is stored under dir.
+ * optional out buffers receive mint address and secret hex (save secret off-server).
  * fails if dir already initialized.
  */
-int chippy_storage_init(const char *dir);
+int chippy_storage_init(const char *dir, char *mint_address_out, char *mint_secret_out);
 /* read mint_pubkey= from config */
 int chippy_storage_load_config(const char *dir, char *mint_pubkey_out);
 /* load config + parse chain file into chain (caller should chippy_chain_init first) */
 int chippy_storage_load_chain(const char *dir, chippy_chain *chain);
 /* append one block record to chain file */
 int chippy_storage_append_block(const char *dir, const chippy_block *block);
-/* load mint secret key from mint.sec */
-int chippy_storage_mint_load_sec(const char *dir, unsigned char *sk_out);
 /* read mint pubkey from config (same as load_config) */
 int chippy_storage_mint_pubkey(const char *dir, char *pub_out);
 
