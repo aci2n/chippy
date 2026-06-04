@@ -1,5 +1,12 @@
 # include paths: local headers plus libsodium from configure
 AM_CPPFLAGS = -I$(srcdir)/include @LIBSODIUM_CFLAGS@
+# engine sources used by chippy and unit tests (not the cli)
+CHIPPY_ENGINE_SRC = \
+	src/util.c \
+	src/crypto.c \
+	src/tx.c \
+	src/chain.c \
+	src/storage.c
 # installable program built in this directory
 bin_PROGRAMS = chippy
 # public API header
@@ -11,11 +18,15 @@ bin_PROGRAMS = chippy
 # cli: command-line tool
 chippy_SOURCES = \
 	include/chippy.h \
-	src/util.c \
-	src/crypto.c \
-	src/tx.c \
-	src/chain.c \
-	src/storage.c \
+	$(CHIPPY_ENGINE_SRC) \
 	cli/main.c
 # link against libsodium
 chippy_LDADD = @LIBSODIUM_LIBS@
+# unit test binary (not installed)
+check_PROGRAMS = test_core
+test_core_SOURCES = tests/test_core.c $(CHIPPY_ENGINE_SRC)
+test_core_LDADD = @LIBSODIUM_LIBS@
+# scripts and binaries run by make check
+TESTS = test_core tests/test_cli.sh
+# ship test script in source tarball
+EXTRA_DIST = tests/test_cli.sh

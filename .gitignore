@@ -31,7 +31,10 @@ web/Makefile.in
 
 # build
 core/chippy
+core/test_core
 core/chippy-asan
+*.log
+*.trs
 chippy-asan
 *.o
 *.Po

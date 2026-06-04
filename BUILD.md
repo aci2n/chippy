@@ -40,6 +40,22 @@ make
 
 Day-to-day work is usually just `make` once `./configure` has been run.
 
+## Tests
+
+GNU convention: run the test suite with
+
+```sh
+make check
+```
+
+This builds `core/test_core` (unit tests against the engine) and runs `core/tests/test_cli.sh` (CLI integration). Tests use temporary directories under `/tmp`; they do not touch `.chippy/` in the repo.
+
+To run only core tests:
+
+```sh
+make -C core check
+```
+
 ## Checked-in build files (what each one is)
 
 These are the files you edit. Everything else under this list’s “Generated” column should stay out of git (see `.gitignore`).
@@ -57,7 +73,9 @@ These are the files you edit. Everything else under this list’s “Generated�
 
 | File | Role |
 |------|------|
-| `Makefile.am` | Defines the `chippy` program: sources, include path, link to `@LIBSODIUM_LIBS@`. |
+| `Makefile.am` | Defines the `chippy` program and `make check` targets (`test_core`, `tests/test_cli.sh`). |
+| `tests/test_core.c` | Unit tests for hex, crypto, tx, chain, and storage. |
+| `tests/test_cli.sh` | CLI integration test (init → mint → send → validate). |
 | `include/chippy.h` | Public C API (compiled as part of the binary, not installed). |
 | `src/*.c`, `cli/main.c` | Engine and CLI sources listed in `chippy_SOURCES`. |
 
