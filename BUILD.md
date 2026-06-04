@@ -74,6 +74,31 @@ Mint secrets stay client-side; `config` in the data dir lists `authorized_mint_k
 
 Debug logging (`LOG_DEBUG` to stderr) is enabled by default. Disable with `./configure --disable-debug`.
 
+## Sanitizer build (memory bugs, UB)
+
+From a build directory:
+
+```sh
+./configure --enable-sanitize
+make check
+```
+
+Or one shot from the repo root (re-runs `autogen.sh` + `configure`):
+
+```sh
+make check-asan
+```
+
+Uses **AddressSanitizer** (heap overflows, use-after-free, leaks at exit) and **UndefinedBehaviorSanitizer**. Helpful runtime options:
+
+```sh
+export ASAN_OPTIONS=detect_leaks=1:abort_on_error=1:symbolize=1
+export UBSAN_OPTIONS=print_stacktrace=1:halt_on_error=1
+make check
+```
+
+Normal release-style build: `./configure` without `--enable-sanitize` (no sanitizer overhead).
+
 ## Generated files
 
 Do not commit: `configure`, `Makefile`, `config.status`, `*.o`, `core/chippy`, etc. (see `.gitignore`).

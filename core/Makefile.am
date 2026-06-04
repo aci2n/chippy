@@ -4,6 +4,11 @@ AM_CPPFLAGS = \
 	-DCHIPPY_STATIC_DIR=\"$(abs_srcdir)/static\" \
 	@LIBSODIUM_CFLAGS@
 
+if CHIPPY_SANITIZE
+AM_CFLAGS = @SAN_CFLAGS@
+AM_LDFLAGS = @SAN_LDFLAGS@
+endif
+
 CHIPPY_LIB_SRC = \
 	src/log.c \
 	src/util.c \
