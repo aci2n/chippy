@@ -1,0 +1,38 @@
+# autotools
+autom4te.cache/
+aclocal.m4
+compile
+config.guess
+config.h
+config.h.in
+config.log
+config.status
+config.sub
+configure
+depcomp
+install-sh
+libtool
+ltmain.sh
+missing
+Makefile
+Makefile.in
+core/Makefile
+core/Makefile.in
+web/Makefile
+web/Makefile.in
+
+# build
+core/chippy
+core/chippy-asan
+core/.deps/
+core/*.o
+*.o
+*.pO
+**/*.dSYM/
+**/.deps/
+**/.dirstamp/
+
+# local data
+.chippy/
+*.key
+
