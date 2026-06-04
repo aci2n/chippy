@@ -76,8 +76,10 @@ These are the files you edit. Everything else under this list’s “Generated�
 | `Makefile.am` | Defines the `chippy` program and `make check` targets (`test_core`, `tests/test_cli.sh`). |
 | `tests/test_core.c` | Unit tests for hex, crypto, tx, chain, and storage. |
 | `tests/test_cli.sh` | CLI integration test (init → mint → send → validate). |
-| `include/chippy.h` | Public C API (compiled as part of the binary, not installed). |
-| `src/*.c` | Engine and CLI (`main.c`) sources listed in `chippy_SOURCES`. |
+| `include/chippy.h` | Ledger engine API (crypto, tx, chain, storage). |
+| `include/chippy_ops.h` | High-level ops (init, mint, transfer, balance, validate, keygen). |
+| `libchippy.a` | Static library: engine + ops (linked by `chippy` and tests). |
+| `src/main.c` | CLI only; dispatches to `chippy_op_*`. |
 
 ### `web/`
 
