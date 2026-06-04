@@ -1,0 +1,20 @@
+core/include/chippy.h
+  s_9dbf29db24a4c7::t_08c37833e05887 1-6,13-16,18,24-25,30,33,41,49,52-54,56,58,61-63,65,67,69,72,75,78-79,83,85,87,90-92,94,96,98-101,103,105-108,111-116,118,120,122,124,126,128,130
+  s_9dbf29db24a4c7::t_aea9f8d53eadf3 80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "4c516ce9bd4b5d4b26ae8c28dcda8837f956f89d",
+  "prompts": {},
+  "sessions": {
+    "s_9dbf29db24a4c7": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "dd0d1440-af67-464a-9a13-8afe598dfa64",
+        "model": "composer-2.5"
+      },
+      "human_author": "aci2n <alvarocalace@hotmail.com>"
+    }
+  }
+}
