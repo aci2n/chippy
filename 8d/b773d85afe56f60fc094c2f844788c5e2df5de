@@ -1,0 +1,23 @@
+core/Makefile.am
+  s_9dbf29db24a4c7::t_4ca3bd0051f5f6 18,22
+RESUME_PROMPT.md
+  s_9dbf29db24a4c7::t_18662a21176fe3 115
+BUILD.md
+  s_9dbf29db24a4c7::t_7c0b002574cc94 80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "8db773d85afe56f60fc094c2f844788c5e2df5de",
+  "prompts": {},
+  "sessions": {
+    "s_9dbf29db24a4c7": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "dd0d1440-af67-464a-9a13-8afe598dfa64",
+        "model": "composer-2.5"
+      },
+      "human_author": "aci2n <alvarocalace@hotmail.com>"
+    }
+  }
+}
