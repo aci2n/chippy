@@ -1,6 +1,6 @@
 # Building Chippy
 
-Chippy uses GNU Autotools at the **repository root** and builds the `chippy` CLI from `core/` and the `backend` REST server. The `web/` directory is a stub for now.
+Chippy uses GNU Autotools at the **repository root** and builds the `chippy` CLI from `core/`, the `backend` REST server, and the `web` frontend server.
 
 You only need the three usual steps: generate `configure`, run `./configure`, then `make`.
 
@@ -20,7 +20,7 @@ From the repo root:
 make
 ```
 
-Binaries: `core/chippy` (CLI), `backend/backend` (HTTP API server).
+Binaries: `core/chippy` (CLI), `backend/backend` (HTTP API server), `web/web` (static HTML server).
 
 To rebuild after pulling changes to `configure.ac` or any `Makefile.am`:
 
@@ -114,7 +114,20 @@ HTTP API (`/api/v1`):
 
 | File | Role |
 |------|------|
-| `Makefile.am` | Placeholder: `make` prints `web: not implemented`. |
+| `Makefile.am` | Builds `web` static file server. |
+| `src/server.c` | Minimal HTTP/1.1 GET server; serves `static/` and `/config.js`. |
+| `static/index.html`, `style.css`, `app.js` | Simple UI; browser `fetch`es the backend API. |
+| `tests/test_web.sh` | Smoke test (run via `make check`). |
+
+Run the frontend (backend must be running separately):
+
+```sh
+export CHIPPY_API_URL=http://127.0.0.1:8080   # backend base URL
+export CHIPPY_LISTEN=127.0.0.1:3000           # optional; default 127.0.0.1:3000
+./web/web
+```
+
+Open `http://127.0.0.1:3000/`. The page loads `/config.js` (sets `window.CHIPPY_API_URL`) then calls the backend for health, balance, validate, mint, and transfer. Signing stays on the CLI (`sign-mint`, `sign-transfer`).
 
 ## Generated files (do not commit)
 

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chippy</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>Chippy</h1>
+    <p class="meta">API: <code id="api-url">…</code></p>
+  </header>
+
+  <main>
+    <section>
+      <h2>Status</h2>
+      <p id="health" class="status">Checking…</p>
+      <button type="button" id="btn-validate">Validate chain</button>
+      <p id="validate-msg" class="msg"></p>
+    </section>
+
+    <section>
+      <h2>Balance</h2>
+      <label>Address <input id="balance-addr" type="text" size="72" placeholder="64 hex chars"></label>
+      <button type="button" id="btn-balance">Look up</button>
+      <p id="balance-msg" class="msg"></p>
+    </section>
+
+    <section>
+      <h2>Mint</h2>
+      <p class="hint">Sign with <code>chippy sign-mint</code>, then submit.</p>
+      <label>To <input id="mint-to" type="text" size="72"></label>
+      <label>Amount <input id="mint-amount" type="number" min="1"></label>
+      <label>Signature <input id="mint-sig" type="text" size="72"></label>
+      <button type="button" id="btn-mint">Submit mint</button>
+      <p id="mint-msg" class="msg"></p>
+    </section>
+
+    <section>
+      <h2>Transfer</h2>
+      <p class="hint">Sign with <code>chippy sign-transfer</code>, then submit.</p>
+      <label>From <input id="xfer-from" type="text" size="72"></label>
+      <label>To <input id="xfer-to" type="text" size="72"></label>
+      <label>Amount <input id="xfer-amount" type="number" min="1"></label>
+      <label>Signature <input id="xfer-sig" type="text" size="72"></label>
+      <button type="button" id="btn-transfer">Submit transfer</button>
+      <p id="xfer-msg" class="msg"></p>
+    </section>
+  </main>
+
+  <script src="/config.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
