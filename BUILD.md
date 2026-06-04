@@ -95,10 +95,10 @@ These are the files you edit. Everything else under this list’s “Generated�
 Run the API server:
 
 ```sh
-./backend/backend --dir /tmp/.chippy --listen 127.0.0.1:8080 --mint-token dev-secret
+./backend/backend --dir /tmp/.chippy --listen 127.0.0.1:8080
 ```
 
-Optional: set `CHIPPY_MINT_TOKEN` instead of `--mint-token` to require `X-Chippy-Mint-Token` on `POST /api/v1/mint`.
+Minting is **CLI only** (`chippy mint`); the HTTP API exposes balance, validate, and signed transfer.
 
 ### `web/`
 

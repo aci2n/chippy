@@ -5,7 +5,6 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <strings.h>
 
 #define API_PREFIX "/api/v1"
 
@@ -43,49 +42,8 @@ static void resp_json(struct http_response *resp, int status, const char *json)
   snprintf(resp->body, sizeof(resp->body), "%s", json);
 }
 
-static int mint_authorized(struct api_ctx *ctx, const char *headers, size_t headers_len)
-{
-  const char *needle = "X-Chippy-Mint-Token:";
-  const char *p;
-  const char *end;
-  size_t token_len;
-
-  if (ctx->mint_token == NULL || ctx->mint_token[0] == '\0') {
-    return 1;
-  }
-  if (headers == NULL) {
-    return 0;
-  }
-  end = headers + headers_len;
-  p = headers;
-  while (p < end) {
-    const char *line_end = memchr(p, '\n', (size_t)(end - p));
-    if (line_end == NULL) {
-      line_end = end;
-    }
-    if ((size_t)(line_end - p) >= strlen(needle) && strncasecmp(p, needle, strlen(needle)) == 0) {
-      const char *val = p + strlen(needle);
-      const char *val_end = line_end;
-      while (val < val_end && (*val == ' ' || *val == '\t')) {
-        val++;
-      }
-      while (val_end > val && (val_end[-1] == '\r' || val_end[-1] == ' ' || val_end[-1] == '\t')) {
-        val_end--;
-      }
-      token_len = strlen(ctx->mint_token);
-      if ((size_t)(val_end - val) == token_len && memcmp(val, ctx->mint_token, token_len) == 0) {
-        return 1;
-      }
-      return 0;
-    }
-    p = line_end + 1;
-  }
-  return 0;
-}
-
 void api_handle(struct api_ctx *ctx, const char *method, size_t method_len, const char *path,
-                size_t path_len, const char *headers, size_t headers_len, const char *body,
-                size_t body_len, struct http_response *resp)
+                size_t path_len, const char *body, size_t body_len, struct http_response *resp)
 {
   size_t off;
   char addr[CHIPPY_HEX_ADDR_LEN + 1];
@@ -167,28 +125,6 @@ void api_handle(struct api_ctx *ctx, const char *method, size_t method_len, cons
     rc = chippy_op_transfer(ctx->data_dir, &tx);
     if (rc != 0) {
       resp_json(resp, 409, "{\"error\":\"transfer rejected\"}");
-      return;
-    }
-    resp_json(resp, 200, "{\"ok\":true}");
-    return;
-  }
-
-  if (path_eq(path, path_len, API_PREFIX "/mint")) {
-    if (method_len != 4 || memcmp(method, "POST", 4) != 0) {
-      return;
-    }
-    if (!mint_authorized(ctx, headers, headers_len)) {
-      resp_json(resp, 403, "{\"error\":\"mint not authorized\"}");
-      return;
-    }
-    if (body == NULL || json_get_string(body, "to", to, sizeof(to)) != 0 ||
-        json_get_u64(body, "amount", &amount) != 0) {
-      resp_json(resp, 400, "{\"error\":\"invalid json body\"}");
-      return;
-    }
-    rc = chippy_op_mint(ctx->data_dir, to, amount);
-    if (rc != 0) {
-      resp_json(resp, 409, "{\"error\":\"mint failed\"}");
       return;
     }
     resp_json(resp, 200, "{\"ok\":true}");

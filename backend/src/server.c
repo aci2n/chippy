@@ -88,7 +88,7 @@ static void send_response(int fd, const struct http_response *resp)
                  "HTTP/1.1 204 No Content\r\n"
                  "Access-Control-Allow-Origin: *\r\n"
                  "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
-                 "Access-Control-Allow-Headers: Content-Type, X-Chippy-Mint-Token\r\n"
+                 "Access-Control-Allow-Headers: Content-Type\r\n"
                  "Connection: close\r\n\r\n");
     if (n > 0) {
       (void)write(fd, header, (size_t)n);
@@ -100,7 +100,7 @@ static void send_response(int fd, const struct http_response *resp)
                "Content-Type: application/json\r\n"
                "Access-Control-Allow-Origin: *\r\n"
                "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
-               "Access-Control-Allow-Headers: Content-Type, X-Chippy-Mint-Token\r\n"
+               "Access-Control-Allow-Headers: Content-Type\r\n"
                "Content-Length: %zu\r\n"
                "Connection: close\r\n\r\n",
                resp->status, text, body_len);
@@ -180,8 +180,7 @@ static void handle_client(int fd, struct api_ctx *ctx)
   }
 
   body = buf + header_end;
-  api_handle(ctx, method, method_len, path, path_len, buf, (size_t)header_end, body,
-             (size_t)body_len, &resp);
+  api_handle(ctx, method, method_len, path, path_len, body, (size_t)body_len, &resp);
   send_response(fd, &resp);
   (void)minor_version;
 }

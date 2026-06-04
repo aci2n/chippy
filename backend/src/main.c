@@ -9,10 +9,7 @@
 
 static void usage(const char *prog)
 {
-  fprintf(stderr,
-          "usage: %s [--dir .chippy] [--listen HOST:PORT] [--mint-token TOKEN]\n"
-          "  env CHIPPY_MINT_TOKEN also enables mint auth header\n",
-          prog);
+  fprintf(stderr, "usage: %s [--dir .chippy] [--listen HOST:PORT]\n", prog);
 }
 
 static int parse_listen(const char *arg, char *host, size_t host_cap, char *port, size_t port_cap)
@@ -40,7 +37,6 @@ int main(int argc, char **argv)
   struct api_ctx ctx;
   char host[256];
   char port[16];
-  const char *mint_token;
   int i;
 
   if (sodium_init() < 0) {
@@ -51,7 +47,6 @@ int main(int argc, char **argv)
   ctx.data_dir = CHIPPY_DEFAULT_DIR;
   strncpy(host, "127.0.0.1", sizeof(host) - 1);
   strncpy(port, "8080", sizeof(port) - 1);
-  mint_token = getenv("CHIPPY_MINT_TOKEN");
 
   for (i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--dir") == 0 && i + 1 < argc) {
@@ -61,15 +56,12 @@ int main(int argc, char **argv)
         usage(argv[0]);
         return 1;
       }
-    } else if (strcmp(argv[i], "--mint-token") == 0 && i + 1 < argc) {
-      mint_token = argv[++i];
     } else {
       usage(argv[0]);
       return 1;
     }
   }
 
-  ctx.mint_token = mint_token;
   if (http_server_run(&ctx, host, port) != 0) {
     return 1;
   }

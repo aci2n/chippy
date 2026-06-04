@@ -5,7 +5,6 @@
 
 struct api_ctx {
   const char *data_dir;
-  const char *mint_token; /* if non-null, POST /mint requires matching header */
 };
 
 struct http_response {
@@ -14,7 +13,6 @@ struct http_response {
 };
 
 void api_handle(struct api_ctx *ctx, const char *method, size_t method_len, const char *path,
-                size_t path_len, const char *headers, size_t headers_len, const char *body,
-                size_t body_len, struct http_response *resp);
+                size_t path_len, const char *body, size_t body_len, struct http_response *resp);
 
 #endif /* BACKEND_API_H */
