@@ -80,6 +80,8 @@ int chippy_sha256_hex(const unsigned char *data, size_t data_len, char *out_hex)
 /* build canonical sign bytes (newline-separated fields); writes length to out_len */
 int chippy_tx_sign_payload(const chippy_tx *tx, unsigned char *buf, size_t buf_cap,
                            size_t *out_len);
+/* fill tx->sig; tx must have type/fields set (mint or transfer) */
+int chippy_tx_sign(chippy_tx *tx, const unsigned char *sk);
 /* check sig against mint_pubkey (mint) or tx->from (transfer) */
 int chippy_tx_verify(const chippy_tx *tx, const char *mint_pubkey);
 /* parse chain-file tx body: "mint - to amt sig" or "transfer from to amt sig" */
@@ -121,7 +123,8 @@ int chippy_dir_unlock(const char *dir);
 /* --- storage (.chippy/ data directory) --- */
 
 /*
- * create dir: mint keys, config (mint_pubkey), wallets/, genesis block in chain.
+ * create dir: mint keys, config (mint_pubkey), genesis block in chain.
+ * does not store user wallets (client-side keys only).
  * fails if dir already initialized.
  */
 int chippy_storage_init(const char *dir);
@@ -131,10 +134,6 @@ int chippy_storage_load_config(const char *dir, char *mint_pubkey_out);
 int chippy_storage_load_chain(const char *dir, chippy_chain *chain);
 /* append one block record to chain file */
 int chippy_storage_append_block(const char *dir, const chippy_block *block);
-/* create wallets/<name>.pub|.sec; write addr hex to addr_out */
-int chippy_storage_wallet_new(const char *dir, const char *name, char *addr_out);
-/* load wallet secret key bytes from wallets/<name>.sec */
-int chippy_storage_wallet_load_sec(const char *dir, const char *name, unsigned char *sk_out);
 /* load mint secret key from mint.sec */
 int chippy_storage_mint_load_sec(const char *dir, unsigned char *sk_out);
 /* read mint pubkey from config (same as load_config) */

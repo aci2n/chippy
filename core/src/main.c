@@ -22,12 +22,13 @@ static void usage(const char *prog)
   fprintf(stderr,
           "usage:\n"
           "  %s init [--dir .chippy]\n"
-          "  %s wallet new <name>\n"
-          "  %s mint <to_addr> <amount>\n"
-          "  %s send <wallet> <to_addr> <amount>\n"
-          "  %s balance <addr>\n"
+          "  %s keygen\n"
+          "  %s sign-transfer <secret_hex> <from> <to> <amount>\n"
+          "  %s transfer <from> <to> <amount> <sig_hex> [--dir .chippy]\n"
+          "  %s mint <to_addr> <amount> [--dir .chippy]\n"
+          "  %s balance <addr> [--dir .chippy]\n"
           "  %s validate [--dir .chippy]\n",
-          prog, prog, prog, prog, prog, prog);
+          prog, prog, prog, prog, prog, prog, prog);
 }
 
 static void parse_global_dir(int argc, char **argv)
@@ -40,6 +41,28 @@ static void parse_global_dir(int argc, char **argv)
       return;
     }
   }
+}
+
+static int valid_address(const char *addr)
+{
+  return addr != NULL && strlen(addr) == CHIPPY_HEX_ADDR_LEN;
+}
+
+static int load_secret_hex(const char *hex, unsigned char *sk_out)
+{
+  int n;
+
+  if (hex == NULL || sk_out == NULL) {
+    return -1;
+  }
+  if (strlen(hex) != CHIPPY_HEX_SEC_LEN) {
+    return -1;
+  }
+  n = chippy_hex_decode(hex, sk_out, crypto_sign_SECRETKEYBYTES);
+  if (n != (int)crypto_sign_SECRETKEYBYTES) {
+    return -1;
+  }
+  return 0;
 }
 
 static int cmd_init(int argc, char **argv)
@@ -59,39 +82,71 @@ static int cmd_init(int argc, char **argv)
   return 0;
 }
 
-static int cmd_wallet_new(int argc, char **argv)
+static int cmd_keygen(void)
 {
+  unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+  unsigned char sk[crypto_sign_SECRETKEYBYTES];
   char addr[CHIPPY_HEX_ADDR_LEN + 1];
+  char sec[CHIPPY_HEX_SEC_LEN + 1];
 
-  if (argc < 4) {
-    return -1;
-  }
-  if (lock_data_dir() != 0) {
+  if (chippy_keypair_generate(pk, sk) != 0) {
+    fprintf(stderr, "keygen failed\n");
     return 1;
   }
-  if (chippy_storage_wallet_new(data_dir, argv[3], addr) != 0) {
-    chippy_dir_unlock(data_dir);
-    fprintf(stderr, "wallet new failed\n");
+  if (chippy_pubkey_to_address(pk, addr) != 0) {
+    fprintf(stderr, "keygen failed\n");
     return 1;
   }
-  chippy_dir_unlock(data_dir);
-  printf("%s\n", addr);
+  if (chippy_hex_encode(sk, sizeof(sk), sec, sizeof(sec)) != 0) {
+    fprintf(stderr, "keygen failed\n");
+    return 1;
+  }
+  printf("address=%s\nsecret=%s\n", addr, sec);
   return 0;
 }
 
-static int make_signed_tx(chippy_tx *tx, const unsigned char *sk)
+static int cmd_sign_transfer(int argc, char **argv)
 {
-  unsigned char payload[512];
-  unsigned char sig[crypto_sign_BYTES];
-  size_t payload_len;
+  chippy_tx tx;
+  unsigned char sk[crypto_sign_SECRETKEYBYTES];
+  unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+  char derived[CHIPPY_HEX_ADDR_LEN + 1];
+  unsigned long long amount;
 
-  if (chippy_tx_sign_payload(tx, payload, sizeof(payload), &payload_len) != 0) {
+  if (argc < 6) {
     return -1;
   }
-  if (chippy_sign(sk, payload, payload_len, sig) != 0) {
-    return -1;
+  if (!valid_address(argv[3]) || !valid_address(argv[4])) {
+    fprintf(stderr, "invalid address\n");
+    return 1;
   }
-  return chippy_hex_encode(sig, sizeof(sig), tx->sig, sizeof(tx->sig));
+  amount = strtoull(argv[5], NULL, 10);
+  if (load_secret_hex(argv[2], sk) != 0) {
+    fprintf(stderr, "invalid secret hex\n");
+    return 1;
+  }
+  crypto_sign_ed25519_sk_to_pk(pk, sk);
+  if (chippy_pubkey_to_address(pk, derived) != 0) {
+    fprintf(stderr, "derive address failed\n");
+    return 1;
+  }
+  if (!chippy_str_eq(derived, argv[3])) {
+    fprintf(stderr, "secret does not match from address\n");
+    return 1;
+  }
+  memset(&tx, 0, sizeof(tx));
+  tx.type = CHIPPY_TX_TRANSFER;
+  strncpy(tx.from, argv[3], CHIPPY_HEX_ADDR_LEN);
+  tx.from[CHIPPY_HEX_ADDR_LEN] = '\0';
+  strncpy(tx.to, argv[4], CHIPPY_HEX_ADDR_LEN);
+  tx.to[CHIPPY_HEX_ADDR_LEN] = '\0';
+  tx.amount = (uint64_t)amount;
+  if (chippy_tx_sign(&tx, sk) != 0) {
+    fprintf(stderr, "sign failed\n");
+    return 1;
+  }
+  printf("%s\n", tx.sig);
+  return 0;
 }
 
 static int append_tx_block(chippy_chain *chain, const chippy_tx *tx)
@@ -133,6 +188,59 @@ static int append_tx_block(chippy_chain *chain, const chippy_tx *tx)
   return 0;
 }
 
+static int cmd_transfer(int argc, char **argv)
+{
+  chippy_chain chain;
+  chippy_tx tx;
+  unsigned long long amount;
+
+  if (argc < 6) {
+    return -1;
+  }
+  if (!valid_address(argv[2]) || !valid_address(argv[3])) {
+    fprintf(stderr, "invalid address\n");
+    return 1;
+  }
+  if (strlen(argv[5]) != CHIPPY_HEX_SIG_LEN) {
+    fprintf(stderr, "invalid signature\n");
+    return 1;
+  }
+  amount = strtoull(argv[4], NULL, 10);
+  if (lock_data_dir() != 0) {
+    return 1;
+  }
+  chippy_chain_init(&chain);
+  if (chippy_storage_load_chain(data_dir, &chain) != 0) {
+    fprintf(stderr, "load chain failed\n");
+    goto transfer_fail;
+  }
+  memset(&tx, 0, sizeof(tx));
+  tx.type = CHIPPY_TX_TRANSFER;
+  strncpy(tx.from, argv[2], CHIPPY_HEX_ADDR_LEN);
+  tx.from[CHIPPY_HEX_ADDR_LEN] = '\0';
+  strncpy(tx.to, argv[3], CHIPPY_HEX_ADDR_LEN);
+  tx.to[CHIPPY_HEX_ADDR_LEN] = '\0';
+  tx.amount = (uint64_t)amount;
+  strncpy(tx.sig, argv[5], CHIPPY_HEX_SIG_LEN);
+  tx.sig[CHIPPY_HEX_SIG_LEN] = '\0';
+  if (chippy_tx_verify(&tx, chain.mint_pubkey) != 0) {
+    fprintf(stderr, "invalid transfer signature\n");
+    goto transfer_fail;
+  }
+  if (append_tx_block(&chain, &tx) != 0) {
+    fprintf(stderr, "append block failed (insufficient balance?)\n");
+    goto transfer_fail;
+  }
+  chippy_chain_free(&chain);
+  chippy_dir_unlock(data_dir);
+  printf("transferred %llu from %s to %s\n", (unsigned long long)amount, argv[2], argv[3]);
+  return 0;
+transfer_fail:
+  chippy_chain_free(&chain);
+  chippy_dir_unlock(data_dir);
+  return 1;
+}
+
 static int cmd_mint(int argc, char **argv)
 {
   chippy_chain chain;
@@ -143,7 +251,7 @@ static int cmd_mint(int argc, char **argv)
   if (argc < 4) {
     return -1;
   }
-  if (strlen(argv[2]) != CHIPPY_HEX_ADDR_LEN) {
+  if (!valid_address(argv[2])) {
     fprintf(stderr, "invalid address\n");
     return 1;
   }
@@ -165,7 +273,7 @@ static int cmd_mint(int argc, char **argv)
   strncpy(tx.to, argv[2], CHIPPY_HEX_ADDR_LEN);
   tx.to[CHIPPY_HEX_ADDR_LEN] = '\0';
   tx.amount = (uint64_t)amount;
-  if (make_signed_tx(&tx, sk) != 0) {
+  if (chippy_tx_sign(&tx, sk) != 0) {
     fprintf(stderr, "sign failed\n");
     goto mint_fail;
   }
@@ -183,65 +291,6 @@ mint_fail:
   return 1;
 }
 
-static int cmd_send(int argc, char **argv)
-{
-  chippy_chain chain;
-  chippy_tx tx;
-  unsigned char sk[crypto_sign_SECRETKEYBYTES];
-  char from_addr[CHIPPY_HEX_ADDR_LEN + 1];
-  unsigned long long amount;
-  unsigned char pk[crypto_sign_PUBLICKEYBYTES];
-
-  if (argc < 5) {
-    return -1;
-  }
-  if (strlen(argv[3]) != CHIPPY_HEX_ADDR_LEN) {
-    fprintf(stderr, "invalid to address\n");
-    return 1;
-  }
-  amount = strtoull(argv[4], NULL, 10);
-  if (lock_data_dir() != 0) {
-    return 1;
-  }
-  chippy_chain_init(&chain);
-  if (chippy_storage_load_chain(data_dir, &chain) != 0) {
-    fprintf(stderr, "load chain failed\n");
-    goto send_fail;
-  }
-  if (chippy_storage_wallet_load_sec(data_dir, argv[2], sk) != 0) {
-    fprintf(stderr, "load wallet failed\n");
-    goto send_fail;
-  }
-  crypto_sign_ed25519_sk_to_pk(pk, sk);
-  if (chippy_pubkey_to_address(pk, from_addr) != 0) {
-    fprintf(stderr, "derive address failed\n");
-    goto send_fail;
-  }
-  memset(&tx, 0, sizeof(tx));
-  tx.type = CHIPPY_TX_TRANSFER;
-  strncpy(tx.from, from_addr, CHIPPY_HEX_ADDR_LEN);
-  tx.from[CHIPPY_HEX_ADDR_LEN] = '\0';
-  strncpy(tx.to, argv[3], CHIPPY_HEX_ADDR_LEN);
-  tx.to[CHIPPY_HEX_ADDR_LEN] = '\0';
-  tx.amount = (uint64_t)amount;
-  if (make_signed_tx(&tx, sk) != 0) {
-    fprintf(stderr, "sign failed\n");
-    goto send_fail;
-  }
-  if (append_tx_block(&chain, &tx) != 0) {
-    fprintf(stderr, "append block failed (insufficient balance?)\n");
-    goto send_fail;
-  }
-  chippy_chain_free(&chain);
-  chippy_dir_unlock(data_dir);
-  printf("sent %llu from %s to %s\n", (unsigned long long)amount, from_addr, argv[3]);
-  return 0;
-send_fail:
-  chippy_chain_free(&chain);
-  chippy_dir_unlock(data_dir);
-  return 1;
-}
-
 static int cmd_balance(int argc, char **argv)
 {
   chippy_chain chain;
@@ -250,7 +299,7 @@ static int cmd_balance(int argc, char **argv)
   if (argc < 3) {
     return -1;
   }
-  if (strlen(argv[2]) != CHIPPY_HEX_ADDR_LEN) {
+  if (!valid_address(argv[2])) {
     fprintf(stderr, "invalid address\n");
     return 1;
   }
@@ -319,12 +368,14 @@ int main(int argc, char **argv)
   rc = 1;
   if (strcmp(argv[1], "init") == 0) {
     rc = cmd_init(argc, argv);
-  } else if (strcmp(argv[1], "wallet") == 0 && argc >= 3 && strcmp(argv[2], "new") == 0) {
-    rc = cmd_wallet_new(argc, argv);
+  } else if (strcmp(argv[1], "keygen") == 0) {
+    rc = cmd_keygen();
+  } else if (strcmp(argv[1], "sign-transfer") == 0) {
+    rc = cmd_sign_transfer(argc, argv);
+  } else if (strcmp(argv[1], "transfer") == 0) {
+    rc = cmd_transfer(argc, argv);
   } else if (strcmp(argv[1], "mint") == 0) {
     rc = cmd_mint(argc, argv);
-  } else if (strcmp(argv[1], "send") == 0) {
-    rc = cmd_send(argc, argv);
   } else if (strcmp(argv[1], "balance") == 0) {
     rc = cmd_balance(argc, argv);
   } else if (strcmp(argv[1], "validate") == 0) {

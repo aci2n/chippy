@@ -26,6 +26,24 @@ int chippy_tx_sign_payload(const chippy_tx *tx, unsigned char *buf, size_t buf_c
   return 0;
 }
 
+int chippy_tx_sign(chippy_tx *tx, const unsigned char *sk)
+{
+  unsigned char payload[512];
+  unsigned char sig[crypto_sign_BYTES];
+  size_t payload_len;
+
+  if (tx == NULL || sk == NULL) {
+    return -1;
+  }
+  if (chippy_tx_sign_payload(tx, payload, sizeof(payload), &payload_len) != 0) {
+    return -1;
+  }
+  if (chippy_sign(sk, payload, payload_len, sig) != 0) {
+    return -1;
+  }
+  return chippy_hex_encode(sig, sizeof(sig), tx->sig, sizeof(tx->sig));
+}
+
 int chippy_tx_verify(const chippy_tx *tx, const char *mint_pubkey)
 {
   unsigned char payload[512];

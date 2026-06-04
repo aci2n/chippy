@@ -134,7 +134,6 @@ static int push_block(chippy_chain *chain, chippy_block *block)
 
 int chippy_storage_init(const char *dir)
 {
-  char wallets[CHIPPY_MAX_PATH];
   char config_path[CHIPPY_MAX_PATH];
   char pub_path[CHIPPY_MAX_PATH];
   char sec_path[CHIPPY_MAX_PATH];
@@ -149,12 +148,6 @@ int chippy_storage_init(const char *dir)
     return -1;
   }
   if (mkdir_p(dir) != 0) {
-    return -1;
-  }
-  if (path_join(wallets, sizeof(wallets), dir, "wallets") != 0) {
-    return -1;
-  }
-  if (mkdir_p(wallets) != 0) {
     return -1;
   }
 
@@ -420,55 +413,6 @@ int chippy_storage_append_block(const char *dir, const chippy_block *block)
   fprintf(f, "hash %s\n", block->hash);
   fprintf(f, "\n");
   fclose(f);
-  return 0;
-}
-
-int chippy_storage_wallet_new(const char *dir, const char *name, char *addr_out)
-{
-  char wallets[CHIPPY_MAX_PATH];
-  char pub_path[CHIPPY_MAX_PATH];
-  char sec_path[CHIPPY_MAX_PATH];
-  unsigned char pk[crypto_sign_PUBLICKEYBYTES];
-  unsigned char sk[crypto_sign_SECRETKEYBYTES];
-
-  if (dir == NULL || name == NULL || addr_out == NULL) {
-    return -1;
-  }
-  if (path_join(wallets, sizeof(wallets), dir, "wallets") != 0) {
-    return -1;
-  }
-  if (mkdir_p(wallets) != 0) {
-    return -1;
-  }
-  if (snprintf(pub_path, sizeof(pub_path), "%s/%s.pub", wallets, name) >= (int)sizeof(pub_path)) {
-    return -1;
-  }
-  if (snprintf(sec_path, sizeof(sec_path), "%s/%s.sec", wallets, name) >= (int)sizeof(sec_path)) {
-    return -1;
-  }
-  if (chippy_keypair_generate(pk, sk) != 0) {
-    return -1;
-  }
-  if (write_keypair_files(pub_path, sec_path, pk, sk) != 0) {
-    return -1;
-  }
-  return chippy_pubkey_to_address(pk, addr_out);
-}
-
-int chippy_storage_wallet_load_sec(const char *dir, const char *name, unsigned char *sk_out)
-{
-  char path[CHIPPY_MAX_PATH];
-
-  if (dir == NULL || name == NULL || sk_out == NULL) {
-    return -1;
-  }
-  if (snprintf(path, sizeof(path), "%s/wallets/%s.sec", dir, name) >= (int)sizeof(path)) {
-    return -1;
-  }
-  if (read_hex_file(path, sk_out, crypto_sign_SECRETKEYBYTES, CHIPPY_HEX_SEC_LEN) !=
-      (int)crypto_sign_SECRETKEYBYTES) {
-    return -1;
-  }
   return 0;
 }
 

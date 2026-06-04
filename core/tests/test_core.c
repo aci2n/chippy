@@ -31,21 +31,6 @@ static void ok(const char *msg)
     } \
   } while (0)
 
-static int sign_tx(chippy_tx *tx, const unsigned char *sk)
-{
-  unsigned char payload[512];
-  unsigned char sig[crypto_sign_BYTES];
-  size_t payload_len;
-
-  if (chippy_tx_sign_payload(tx, payload, sizeof(payload), &payload_len) != 0) {
-    return -1;
-  }
-  if (chippy_sign(sk, payload, payload_len, sig) != 0) {
-    return -1;
-  }
-  return chippy_hex_encode(sig, sizeof(sig), tx->sig, sizeof(tx->sig));
-}
-
 static int append_block(chippy_chain *chain, const chippy_tx *tx)
 {
   chippy_block block;
@@ -186,7 +171,7 @@ static void test_chain_flow(char *dir)
   tx.type = CHIPPY_TX_MINT;
   strncpy(tx.to, alice_addr, CHIPPY_HEX_ADDR_LEN);
   tx.amount = 1000;
-  ASSERT(sign_tx(&tx, mint_sk) == 0, "sign mint tx");
+  ASSERT(chippy_tx_sign(&tx, mint_sk) == 0, "sign mint tx");
   ASSERT(append_block(&chain, &tx) == 0, "append mint block");
   ASSERT(chippy_chain_balance(&chain, alice_addr, &balance) == 0, "alice balance after mint");
   ASSERT(balance == 1000, "alice has 1000");
@@ -196,7 +181,7 @@ static void test_chain_flow(char *dir)
   strncpy(tx.from, alice_addr, CHIPPY_HEX_ADDR_LEN);
   strncpy(tx.to, bob_addr, CHIPPY_HEX_ADDR_LEN);
   tx.amount = 250;
-  ASSERT(sign_tx(&tx, alice_sk) == 0, "sign transfer tx");
+  ASSERT(chippy_tx_sign(&tx, alice_sk) == 0, "sign transfer tx");
   ASSERT(append_block(&chain, &tx) == 0, "append transfer block");
   ASSERT(chippy_chain_balance(&chain, alice_addr, &balance) == 0, "alice balance after send");
   ASSERT(balance == 750, "alice has 750");
@@ -209,10 +194,10 @@ static void test_chain_flow(char *dir)
   strncpy(tx.from, alice_addr, CHIPPY_HEX_ADDR_LEN);
   strncpy(tx.to, bob_addr, CHIPPY_HEX_ADDR_LEN);
   tx.amount = 9000;
-  ASSERT(sign_tx(&tx, alice_sk) == 0, "sign overspend tx");
+  ASSERT(chippy_tx_sign(&tx, alice_sk) == 0, "sign overspend tx");
   ASSERT(append_block(&chain, &tx) != 0, "reject overspend append");
 
-  chain.blocks[1].hash[0] = 'f';
+  chain.blocks[1].hash[0] ^= (char)1;
   ASSERT(chippy_chain_validate(&chain) != 0, "reject tampered block hash");
 
   chippy_chain_free(&chain);
@@ -247,7 +232,7 @@ static void test_storage_roundtrip(void)
   tx.type = CHIPPY_TX_MINT;
   strncpy(tx.to, addr, CHIPPY_HEX_ADDR_LEN);
   tx.amount = 500;
-  ASSERT(sign_tx(&tx, mint_sk) == 0, "sign mint for disk");
+  ASSERT(chippy_tx_sign(&tx, mint_sk) == 0, "sign mint for disk");
   ASSERT(append_block(&chain, &tx) == 0, "append mint in memory");
   saved = chain.blocks[chain.block_count - 1];
   ASSERT(chippy_storage_append_block(dir, &saved) == 0, "write block to chain file");
