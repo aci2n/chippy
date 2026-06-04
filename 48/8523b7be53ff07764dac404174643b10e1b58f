@@ -1,0 +1,19 @@
+doc/SERVER_PLAN.md
+  s_9dbf29db24a4c7::t_ef3f6c397529ab 1-123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "488523b7be53ff07764dac404174643b10e1b58f",
+  "prompts": {},
+  "sessions": {
+    "s_9dbf29db24a4c7": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "dd0d1440-af67-464a-9a13-8afe598dfa64",
+        "model": "composer-2.5"
+      },
+      "human_author": "aci2n <alvarocalace@hotmail.com>"
+    }
+  }
+}
