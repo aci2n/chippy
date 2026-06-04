@@ -108,6 +108,16 @@ int chippy_chain_balance(const chippy_chain *chain, const char *addr_hex, uint64
  */
 int chippy_chain_append_block(chippy_chain *chain, chippy_block *block);
 
+/* --- data directory lock (dir/lock, flock) --- */
+
+/*
+ * exclusive lock for one .chippy tree. re-entrant for the same dir in one process.
+ * hold across load + append. returns -1 if a different dir is already locked.
+ */
+int chippy_dir_lock(const char *dir);
+int chippy_dir_trylock(const char *dir);
+int chippy_dir_unlock(const char *dir);
+
 /* --- storage (.chippy/ data directory) --- */
 
 /*

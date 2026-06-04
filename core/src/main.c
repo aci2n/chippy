@@ -8,6 +8,15 @@
 
 static const char *data_dir = CHIPPY_DEFAULT_DIR;
 
+static int lock_data_dir(void)
+{
+  if (chippy_dir_lock(data_dir) != 0) {
+    fprintf(stderr, "data dir in use: %s\n", data_dir);
+    return -1;
+  }
+  return 0;
+}
+
 static void usage(const char *prog)
 {
   fprintf(stderr,
@@ -37,10 +46,15 @@ static int cmd_init(int argc, char **argv)
 {
   (void)argc;
   (void)argv;
+  if (lock_data_dir() != 0) {
+    return 1;
+  }
   if (chippy_storage_init(data_dir) != 0) {
+    chippy_dir_unlock(data_dir);
     fprintf(stderr, "init failed\n");
     return 1;
   }
+  chippy_dir_unlock(data_dir);
   printf("initialized data dir: %s\n", data_dir);
   return 0;
 }
@@ -52,10 +66,15 @@ static int cmd_wallet_new(int argc, char **argv)
   if (argc < 4) {
     return -1;
   }
+  if (lock_data_dir() != 0) {
+    return 1;
+  }
   if (chippy_storage_wallet_new(data_dir, argv[3], addr) != 0) {
+    chippy_dir_unlock(data_dir);
     fprintf(stderr, "wallet new failed\n");
     return 1;
   }
+  chippy_dir_unlock(data_dir);
   printf("%s\n", addr);
   return 0;
 }
@@ -129,15 +148,17 @@ static int cmd_mint(int argc, char **argv)
     return 1;
   }
   amount = strtoull(argv[3], NULL, 10);
+  if (lock_data_dir() != 0) {
+    return 1;
+  }
   chippy_chain_init(&chain);
   if (chippy_storage_load_chain(data_dir, &chain) != 0) {
     fprintf(stderr, "load chain failed\n");
-    return 1;
+    goto mint_fail;
   }
   if (chippy_storage_mint_load_sec(data_dir, sk) != 0) {
-    chippy_chain_free(&chain);
     fprintf(stderr, "load mint key failed\n");
-    return 1;
+    goto mint_fail;
   }
   memset(&tx, 0, sizeof(tx));
   tx.type = CHIPPY_TX_MINT;
@@ -145,18 +166,21 @@ static int cmd_mint(int argc, char **argv)
   tx.to[CHIPPY_HEX_ADDR_LEN] = '\0';
   tx.amount = (uint64_t)amount;
   if (make_signed_tx(&tx, sk) != 0) {
-    chippy_chain_free(&chain);
     fprintf(stderr, "sign failed\n");
-    return 1;
+    goto mint_fail;
   }
   if (append_tx_block(&chain, &tx) != 0) {
-    chippy_chain_free(&chain);
     fprintf(stderr, "append block failed\n");
-    return 1;
+    goto mint_fail;
   }
   chippy_chain_free(&chain);
+  chippy_dir_unlock(data_dir);
   printf("minted %llu to %s\n", (unsigned long long)amount, argv[2]);
   return 0;
+mint_fail:
+  chippy_chain_free(&chain);
+  chippy_dir_unlock(data_dir);
+  return 1;
 }
 
 static int cmd_send(int argc, char **argv)
@@ -176,21 +200,22 @@ static int cmd_send(int argc, char **argv)
     return 1;
   }
   amount = strtoull(argv[4], NULL, 10);
+  if (lock_data_dir() != 0) {
+    return 1;
+  }
   chippy_chain_init(&chain);
   if (chippy_storage_load_chain(data_dir, &chain) != 0) {
     fprintf(stderr, "load chain failed\n");
-    return 1;
+    goto send_fail;
   }
   if (chippy_storage_wallet_load_sec(data_dir, argv[2], sk) != 0) {
-    chippy_chain_free(&chain);
     fprintf(stderr, "load wallet failed\n");
-    return 1;
+    goto send_fail;
   }
   crypto_sign_ed25519_sk_to_pk(pk, sk);
   if (chippy_pubkey_to_address(pk, from_addr) != 0) {
-    chippy_chain_free(&chain);
     fprintf(stderr, "derive address failed\n");
-    return 1;
+    goto send_fail;
   }
   memset(&tx, 0, sizeof(tx));
   tx.type = CHIPPY_TX_TRANSFER;
@@ -200,18 +225,21 @@ static int cmd_send(int argc, char **argv)
   tx.to[CHIPPY_HEX_ADDR_LEN] = '\0';
   tx.amount = (uint64_t)amount;
   if (make_signed_tx(&tx, sk) != 0) {
-    chippy_chain_free(&chain);
     fprintf(stderr, "sign failed\n");
-    return 1;
+    goto send_fail;
   }
   if (append_tx_block(&chain, &tx) != 0) {
-    chippy_chain_free(&chain);
     fprintf(stderr, "append block failed (insufficient balance?)\n");
-    return 1;
+    goto send_fail;
   }
   chippy_chain_free(&chain);
+  chippy_dir_unlock(data_dir);
   printf("sent %llu from %s to %s\n", (unsigned long long)amount, from_addr, argv[3]);
   return 0;
+send_fail:
+  chippy_chain_free(&chain);
+  chippy_dir_unlock(data_dir);
+  return 1;
 }
 
 static int cmd_balance(int argc, char **argv)
@@ -226,17 +254,23 @@ static int cmd_balance(int argc, char **argv)
     fprintf(stderr, "invalid address\n");
     return 1;
   }
+  if (lock_data_dir() != 0) {
+    return 1;
+  }
   chippy_chain_init(&chain);
   if (chippy_storage_load_chain(data_dir, &chain) != 0) {
+    chippy_dir_unlock(data_dir);
     fprintf(stderr, "load chain failed\n");
     return 1;
   }
   if (chippy_chain_balance(&chain, argv[2], &balance) != 0) {
     chippy_chain_free(&chain);
+    chippy_dir_unlock(data_dir);
     fprintf(stderr, "balance failed\n");
     return 1;
   }
   chippy_chain_free(&chain);
+  chippy_dir_unlock(data_dir);
   printf("%llu\n", (unsigned long long)balance);
   return 0;
 }
@@ -247,17 +281,23 @@ static int cmd_validate(int argc, char **argv)
 
   (void)argc;
   (void)argv;
+  if (lock_data_dir() != 0) {
+    return 1;
+  }
   chippy_chain_init(&chain);
   if (chippy_storage_load_chain(data_dir, &chain) != 0) {
+    chippy_dir_unlock(data_dir);
     fprintf(stderr, "load chain failed\n");
     return 1;
   }
   if (chippy_chain_validate(&chain) != 0) {
     chippy_chain_free(&chain);
+    chippy_dir_unlock(data_dir);
     fprintf(stderr, "chain invalid\n");
     return 1;
   }
   chippy_chain_free(&chain);
+  chippy_dir_unlock(data_dir);
   printf("ok\n");
   return 0;
 }

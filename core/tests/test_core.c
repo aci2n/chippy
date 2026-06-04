@@ -100,6 +100,14 @@ static char *make_temp_dir(void)
   return dir;
 }
 
+static void test_dir_lock(char *dir)
+{
+  ASSERT(chippy_dir_lock(dir) == 0, "dir lock");
+  ASSERT(chippy_dir_lock(dir) == 0, "dir lock reentrant");
+  ASSERT(chippy_dir_unlock(dir) == 0, "dir unlock inner");
+  ASSERT(chippy_dir_unlock(dir) == 0, "dir unlock outer");
+}
+
 static void test_hex(void)
 {
   unsigned char bin[] = {0xde, 0xad, 0xbe, 0xef};
@@ -274,6 +282,7 @@ int main(void)
     fprintf(stderr, "%d test(s) failed\n", failures);
     return failures > 0 ? 1 : 0;
   }
+  test_dir_lock(dir);
   test_chain_flow(dir);
   free(dir);
   test_storage_roundtrip();

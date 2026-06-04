@@ -6,6 +6,7 @@ CHIPPY_ENGINE_SRC = \
 	src/crypto.c \
 	src/tx.c \
 	src/chain.c \
+	src/lock.c \
 	src/storage.c
 # installable program built in this directory
 bin_PROGRAMS = chippy
