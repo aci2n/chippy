@@ -140,7 +140,7 @@ int chippy_dir_unlock(const char *dir);
  * fails if dir already initialized.
  */
 int chippy_storage_init(const char *dir, char *mint_address_out, char *mint_secret_out);
-/* read authorized_mint_key= lines (and legacy mint_pubkey=) from config */
+/* read authorized_mint_key= lines from config */
 int chippy_storage_load_mint_keys(const char *dir, chippy_mint_keys *keys_out);
 /* append authorized_mint_key= line if not already present */
 int chippy_storage_add_authorized_mint_key(const char *dir, const char *addr_hex);

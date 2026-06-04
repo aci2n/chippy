@@ -152,27 +152,20 @@ int chippy_storage_init(const char *dir, char *mint_address_out, char *mint_secr
 
 static int parse_mint_key_line(const char *line, chippy_mint_keys *keys_out)
 {
-  const char *eq;
-  size_t prefix_len;
-  const char *prefix;
+  const char *prefix = "authorized_mint_key=";
+  const char *val;
 
   if (line == NULL || keys_out == NULL) {
     return -1;
   }
-  prefix = "authorized_mint_key=";
-  prefix_len = 20;
-  if (strncmp(line, prefix, prefix_len) != 0) {
-    prefix = "mint_pubkey=";
-    prefix_len = 12;
-    if (strncmp(line, prefix, prefix_len) != 0) {
-      return -1;
-    }
-  }
-  eq = line + prefix_len;
-  if (strlen(eq) != CHIPPY_HEX_PUB_LEN) {
+  if (strncmp(line, prefix, 20) != 0) {
     return -1;
   }
-  return chippy_mint_keys_add(keys_out, eq);
+  val = line + 20;
+  if (strlen(val) != CHIPPY_HEX_ADDR_LEN) {
+    return -1;
+  }
+  return chippy_mint_keys_add(keys_out, val);
 }
 
 int chippy_storage_load_mint_keys(const char *dir, chippy_mint_keys *keys_out)
