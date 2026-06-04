@@ -1,4 +1,5 @@
 #include "chippy.h"
+#include "log.h"
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -39,9 +40,11 @@ static int lock_acquire(const char *dir, int nonblock)
   }
   if (lock_depth > 0) {
     if (!chippy_str_eq(lock_path, path)) {
+      LOG_DEBUG("lock conflict held=%s requested=%s", lock_path, path);
       return -1;
     }
     lock_depth++;
+    LOG_DEBUG("lock reentrant depth=%d path=%s", lock_depth, path);
     return 0;
   }
 #if !CHIPPY_HAVE_FLOCK
@@ -66,6 +69,7 @@ static int lock_acquire(const char *dir, int nonblock)
   strncpy(lock_path, path, CHIPPY_MAX_PATH - 1);
   lock_path[CHIPPY_MAX_PATH - 1] = '\0';
   lock_depth = 1;
+  LOG_DEBUG("lock acquired path=%s nonblock=%d", path, nonblock);
   return 0;
 #endif
 }
@@ -95,6 +99,7 @@ int chippy_dir_unlock(const char *dir)
   }
   lock_depth--;
   if (lock_depth > 0) {
+    LOG_DEBUG("lock release deferred depth=%d path=%s", lock_depth, path);
     return 0;
   }
 #if CHIPPY_HAVE_FLOCK
@@ -103,5 +108,6 @@ int chippy_dir_unlock(const char *dir)
   close(lock_fd);
   lock_fd = -1;
   lock_path[0] = '\0';
+  LOG_DEBUG("lock released path=%s", path);
   return 0;
 }

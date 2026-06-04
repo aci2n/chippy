@@ -49,6 +49,10 @@ input[type="number"] {
   padding: 0.25rem;
 }
 
+input[readonly] {
+  background: #f0f0f0;
+}
+
 button {
   margin-top: 0.5rem;
   padding: 0.35rem 0.75rem;

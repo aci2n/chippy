@@ -1,4 +1,5 @@
 #include "chippy.h"
+#include "log.h"
 
 #include <sodium.h>
 #include <string.h>
@@ -9,6 +10,7 @@ int chippy_keypair_generate(unsigned char *pk, unsigned char *sk)
     return -1;
   }
   crypto_sign_keypair(pk, sk);
+  LOG_DEBUG("keypair_generate");
   return 0;
 }
 
@@ -62,6 +64,7 @@ int chippy_verify(const char *addr_hex, const unsigned char *msg, size_t msg_len
     return -1;
   }
   if (crypto_sign_verify_detached(sig, msg, msg_len, pk) != 0) {
+    LOG_DEBUG("verify failed addr=%s msg_len=%zu", addr_hex, msg_len);
     return -1;
   }
   return 0;

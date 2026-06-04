@@ -6,9 +6,11 @@ CHIPPY="${CHIPPY:-./chippy}"
 DIR=$(mktemp -d "${TMPDIR:-/tmp}/chippy-cli-XXXXXX")
 trap 'rm -rf "$DIR"' EXIT
 
-INIT=$("$CHIPPY" init --dir "$DIR")
-MINT_ADDR=$(echo "$INIT" | sed -n 's/^mint_address=//p')
-MINT_SK=$(echo "$INIT" | sed -n 's/^mint_secret=//p')
+"$CHIPPY" init --dir "$DIR"
+MINT_KEYS=$("$CHIPPY" keygen)
+MINT_ADDR=$(echo "$MINT_KEYS" | sed -n 's/^address=//p')
+MINT_SK=$(echo "$MINT_KEYS" | sed -n 's/^secret=//p')
+"$CHIPPY" mint-key add "$MINT_ADDR" --dir "$DIR"
 ALICE_KEYS=$("$CHIPPY" keygen)
 ALICE=$(echo "$ALICE_KEYS" | sed -n 's/^address=//p')
 ALICE_SK=$(echo "$ALICE_KEYS" | sed -n 's/^secret=//p')

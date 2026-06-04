@@ -1,4 +1,5 @@
 #include "chippy_ops.h"
+#include "log.h"
 
 #include <sodium.h>
 #include <stdlib.h>
@@ -42,28 +43,37 @@ static int append_tx_block(const char *dir, chippy_chain *chain, const chippy_tx
     free(heap_tx);
     return -1;
   }
-  if (chippy_storage_append_block(dir, &block) != 0) {
-    free(heap_tx);
-    return -1;
-  }
   if (chippy_chain_append_block(chain, &block) != 0) {
+    LOG_DEBUG("append_tx_block rejected (validation failed) index=%llu",
+              (unsigned long long)block.index);
     return -1;
   }
+  if (chippy_storage_append_block(dir, &chain->blocks[chain->block_count - 1]) != 0) {
+    LOG_DEBUG("append_tx_block storage write failed index=%llu",
+              (unsigned long long)block.index);
+    return -1;
+  }
+  LOG_DEBUG("appended block index=%llu hash=%s txs=%zu", (unsigned long long)block.index,
+            chain->blocks[chain->block_count - 1].hash,
+            chain->blocks[chain->block_count - 1].tx_count);
   return 0;
 }
 
-int chippy_op_init(const char *dir, char *mint_address_out, char *mint_secret_out)
-{
+int chippy_op_init(const char *dir) {
+  LOG_DEBUG("op_init dir=%s", dir ? dir : "(null)");
   if (dir == NULL) {
     return -1;
   }
   if (chippy_dir_lock(dir) != 0) {
+    LOG_DEBUG("op_init lock failed dir=%s", dir);
     return -1;
   }
-  if (chippy_storage_init(dir, mint_address_out, mint_secret_out) != 0) {
+  if (chippy_storage_init(dir) != 0) {
+    LOG_DEBUG("op_init storage_init failed dir=%s", dir);
     chippy_dir_unlock(dir);
     return -1;
   }
+  LOG_DEBUG("op_init ok dir=%s", dir);
   return chippy_dir_unlock(dir);
 }
 
@@ -76,7 +86,9 @@ int chippy_op_submit_tx(const char *dir, const chippy_tx *tx)
   if (dir == NULL || tx == NULL) {
     return -1;
   }
+  LOG_DEBUG("op_submit_tx dir=%s type=%d", dir, (int)tx->type);
   if (strlen(tx->sig) != CHIPPY_HEX_SIG_LEN) {
+    LOG_DEBUG("op_submit_tx invalid sig length");
     return -1;
   }
   if (tx->type == CHIPPY_TX_MINT) {
@@ -91,21 +103,28 @@ int chippy_op_submit_tx(const char *dir, const chippy_tx *tx)
     return -1;
   }
   if (chippy_dir_lock(dir) != 0) {
+    LOG_DEBUG("op_submit_tx lock failed dir=%s", dir);
     return -1;
   }
   rc = -1;
   chippy_chain_init(&chain);
   if (chippy_storage_load_chain(dir, &chain) != 0) {
+    LOG_DEBUG("op_submit_tx load_chain failed dir=%s", dir);
     goto done;
   }
+  LOG_DEBUG("op_submit_tx loaded blocks=%zu mint_keys=%zu", chain.block_count,
+            chain.mint_keys.count);
   copy = *tx;
   if (chippy_tx_verify(&copy, &chain.mint_keys) != 0) {
+    LOG_DEBUG("op_submit_tx verify failed type=%d", (int)copy.type);
     goto done;
   }
   if (append_tx_block(dir, &chain, &copy) != 0) {
+    LOG_DEBUG("op_submit_tx append failed");
     goto done;
   }
   rc = 0;
+  LOG_DEBUG("op_submit_tx ok dir=%s", dir);
 done:
   chippy_chain_free(&chain);
   if (chippy_dir_unlock(dir) != 0) {
@@ -138,6 +157,7 @@ int chippy_op_balance(const char *dir, const char *addr_hex, uint64_t *balance_o
   if (dir == NULL || !address_valid(addr_hex) || balance_out == NULL) {
     return -1;
   }
+  LOG_DEBUG("op_balance dir=%s addr=%s", dir, addr_hex);
   if (chippy_dir_lock(dir) != 0) {
     return -1;
   }
@@ -150,6 +170,7 @@ int chippy_op_balance(const char *dir, const char *addr_hex, uint64_t *balance_o
     goto done;
   }
   rc = 0;
+  LOG_DEBUG("op_balance ok addr=%s balance=%llu", addr_hex, (unsigned long long)*balance_out);
 done:
   chippy_chain_free(&chain);
   if (chippy_dir_unlock(dir) != 0) {
@@ -163,6 +184,7 @@ int chippy_op_validate(const char *dir)
   chippy_chain chain;
   int rc;
 
+  LOG_DEBUG("op_validate dir=%s", dir);
   if (dir == NULL) {
     return -1;
   }
@@ -172,12 +194,15 @@ int chippy_op_validate(const char *dir)
   rc = -1;
   chippy_chain_init(&chain);
   if (chippy_storage_load_chain(dir, &chain) != 0) {
+    LOG_DEBUG("op_validate load_chain failed");
     goto done;
   }
   if (chippy_chain_validate(&chain) != 0) {
+    LOG_DEBUG("op_validate chain invalid blocks=%zu", chain.block_count);
     goto done;
   }
   rc = 0;
+  LOG_DEBUG("op_validate ok blocks=%zu", chain.block_count);
 done:
   chippy_chain_free(&chain);
   if (chippy_dir_unlock(dir) != 0) {
@@ -230,8 +255,11 @@ int chippy_op_sign_transfer(const char *secret_hex, const char *from_addr, const
     return -1;
   }
   if (!chippy_str_eq(derived, from_addr)) {
+    LOG_DEBUG("op_sign_transfer secret/address mismatch from=%s", from_addr);
     return -1;
   }
+  LOG_DEBUG("op_sign_transfer from=%s to=%s amount=%llu", from_addr, to_addr,
+            (unsigned long long)amount);
   memset(&tx, 0, sizeof(tx));
   tx.type = CHIPPY_TX_TRANSFER;
   strncpy(tx.from, from_addr, CHIPPY_HEX_ADDR_LEN);
@@ -274,8 +302,11 @@ int chippy_op_sign_mint(const char *mint_secret_hex, const char *mint_address,
     return -1;
   }
   if (!chippy_str_eq(derived, mint_address)) {
+    LOG_DEBUG("op_sign_mint secret/address mismatch mint=%s", mint_address);
     return -1;
   }
+  LOG_DEBUG("op_sign_mint mint=%s to=%s amount=%llu", mint_address, to_addr,
+            (unsigned long long)amount);
   memset(&tx, 0, sizeof(tx));
   tx.type = CHIPPY_TX_MINT;
   tx.from[0] = '\0';

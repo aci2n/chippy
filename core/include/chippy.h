@@ -133,15 +133,8 @@ int chippy_dir_unlock(const char *dir);
 
 /* --- storage (.chippy/ data directory) --- */
 
-/*
- * create dir: config (authorized_mint_key) + genesis block.
- * generates a new mint keypair; only the pubkey is stored under dir.
- * optional out buffers receive mint address and secret hex (save secret off-server).
- * fails if dir already initialized.
- */
-int chippy_storage_init(const char *dir, char *mint_address_out, char *mint_secret_out);
-/* read authorized_mint_key= lines from config */
-int chippy_storage_load_mint_keys(const char *dir, chippy_mint_keys *keys_out);
+/* create dir: empty config + genesis block */
+int chippy_storage_init(const char *dir);
 /* append authorized_mint_key= line if not already present */
 int chippy_storage_add_authorized_mint_key(const char *dir, const char *addr_hex);
 /* load config + parse chain file into chain (caller should chippy_chain_init first) */

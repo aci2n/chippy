@@ -1,4 +1,5 @@
 #include "chippy.h"
+#include "log.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -84,9 +85,11 @@ static int apply_tx(balance_map *map, const chippy_tx *tx, const chippy_mint_key
     return -1;
   }
   if (chippy_tx_verify(tx, mint_keys) != 0) {
+    LOG_DEBUG("apply_tx verify failed type=%d", (int)tx->type);
     return -1;
   }
   if (tx->type == CHIPPY_TX_MINT) {
+    LOG_DEBUG("apply_tx mint to=%s amount=%llu", tx->to, (unsigned long long)tx->amount);
     if (balance_get(map, tx->to, &to_bal) != 0) {
       return -1;
     }
@@ -99,8 +102,12 @@ static int apply_tx(balance_map *map, const chippy_tx *tx, const chippy_mint_key
     return -1;
   }
   if (from_bal < tx->amount) {
+    LOG_DEBUG("apply_tx insufficient funds from=%s have=%llu need=%llu", tx->from,
+              (unsigned long long)from_bal, (unsigned long long)tx->amount);
     return -1;
   }
+  LOG_DEBUG("apply_tx transfer from=%s to=%s amount=%llu", tx->from, tx->to,
+            (unsigned long long)tx->amount);
   if (balance_get(map, tx->to, &to_bal) != 0) {
     return -1;
   }
@@ -262,6 +269,7 @@ int chippy_chain_validate(const chippy_chain *chain)
   if (chain == NULL) {
     return -1;
   }
+  LOG_DEBUG("chain_validate blocks=%zu mint_keys=%zu", chain->block_count, chain->mint_keys.count);
   if (chain->mint_keys.count == 0) {
     return -1;
   }
@@ -271,6 +279,7 @@ int chippy_chain_validate(const chippy_chain *chain)
   memset(&map, 0, sizeof(map));
   for (i = 0; i < chain->block_count; i++) {
     if (validate_block_links(chain, i) != 0) {
+      LOG_DEBUG("chain_validate bad link at block %zu", i);
       balance_map_free(&map);
       return -1;
     }
@@ -279,15 +288,18 @@ int chippy_chain_validate(const chippy_chain *chain)
       return -1;
     }
     if (!chippy_str_eq(computed, chain->blocks[i].hash)) {
+      LOG_DEBUG("chain_validate hash mismatch at block %zu", i);
       balance_map_free(&map);
       return -1;
     }
     if (apply_block(&map, &chain->blocks[i], &chain->mint_keys) != 0) {
+      LOG_DEBUG("chain_validate apply failed at block %zu", i);
       balance_map_free(&map);
       return -1;
     }
   }
   balance_map_free(&map);
+  LOG_DEBUG("chain_validate ok");
   return 0;
 }
 
@@ -323,6 +335,8 @@ int chippy_chain_append_block(chippy_chain *chain, chippy_block *block)
   if (chain == NULL || block == NULL) {
     return -1;
   }
+  LOG_DEBUG("chain_append_block new_index=%llu txs=%zu", (unsigned long long)block->index,
+            block->tx_count);
   chippy_chain_init(&replay);
   chippy_mint_keys_copy(&replay.mint_keys, &chain->mint_keys);
   for (i = 0; i < chain->block_count; i++) {
@@ -350,7 +364,15 @@ int chippy_chain_append_block(chippy_chain *chain, chippy_block *block)
   }
   replay.blocks[replay.block_count++] = *block;
   if (chippy_chain_validate(&replay) != 0) {
+    LOG_DEBUG("chain_append_block replay validation failed");
+    if (replay.block_count > 0) {
+      replay.blocks[replay.block_count - 1].txs = NULL;
+      replay.blocks[replay.block_count - 1].tx_count = 0;
+    }
     chippy_chain_free(&replay);
+    free(block->txs);
+    block->txs = NULL;
+    block->tx_count = 0;
     return -1;
   }
   if (replay.block_count > 0) {

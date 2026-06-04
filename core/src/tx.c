@@ -1,4 +1,5 @@
 #include "chippy.h"
+#include "log.h"
 
 #include <sodium.h>
 #include <stdio.h>
@@ -65,19 +66,29 @@ int chippy_tx_verify(const chippy_tx *tx, const chippy_mint_keys *mint_keys)
   }
   if (tx->type == CHIPPY_TX_MINT) {
     if (mint_keys->count == 0) {
+      LOG_DEBUG("tx_verify mint no authorized keys");
       return -1;
     }
     for (i = 0; i < mint_keys->count; i++) {
       if (chippy_verify(mint_keys->keys[i], payload, payload_len, sig) == 0) {
+        LOG_DEBUG("tx_verify mint ok to=%s amount=%llu key_idx=%zu", tx->to,
+                  (unsigned long long)tx->amount, i);
         return 0;
       }
     }
+    LOG_DEBUG("tx_verify mint signature rejected to=%s", tx->to);
     return -1;
   }
   if (strlen(tx->from) != CHIPPY_HEX_ADDR_LEN) {
     return -1;
   }
-  return chippy_verify(tx->from, payload, payload_len, sig);
+  if (chippy_verify(tx->from, payload, payload_len, sig) != 0) {
+    LOG_DEBUG("tx_verify transfer rejected from=%s", tx->from);
+    return -1;
+  }
+  LOG_DEBUG("tx_verify transfer ok from=%s to=%s amount=%llu", tx->from, tx->to,
+            (unsigned long long)tx->amount);
+  return 0;
 }
 
 int chippy_tx_parse_line(const char *line, chippy_tx *tx)

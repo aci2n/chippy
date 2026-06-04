@@ -26,28 +26,24 @@ Makefile
 Makefile.in
 core/Makefile
 core/Makefile.in
+backend/Makefile
+backend/Makefile.in
 web/Makefile
 web/Makefile.in
 
 # build
 core/chippy
-core/libchippy.a
 core/test_core
-backend/backend
-web/web
-backend/Makefile
-backend/Makefile.in
-backend/**/*.o
-backend/.deps/
-core/chippy-asan
 *.log
 *.trs
 chippy-asan
+core/chippy-asan
 *.o
 *.Po
 .dirstamp
 .deps/
 *.dSYM/
+*.a
 
 # local data
 .chippy/

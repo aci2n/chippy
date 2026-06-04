@@ -9,7 +9,14 @@ AC_PROG_CC
 AC_PROG_RANLIB
 # libsodium via pkg-config; sets LIBSODIUM_CFLAGS and LIBSODIUM_LIBS
 PKG_CHECK_MODULES([LIBSODIUM], [libsodium >= 1.0.0])
+# debug logging (LOG_DEBUG); on by default
+AC_ARG_ENABLE([debug],
+  [AS_HELP_STRING([--disable-debug], [disable debug logging (default: enabled)])],
+  [chippy_debug=$enableval],
+  [chippy_debug=yes])
+AS_IF([test "x$chippy_debug" != "xno"],
+  [AC_DEFINE([CHIPPY_DEBUG], [1], [Enable debug logging])])
 # generate Makefiles from Makefile.in templates
-AC_CONFIG_FILES([Makefile core/Makefile backend/Makefile web/Makefile])
+AC_CONFIG_FILES([Makefile core/Makefile])
 # emit configured files and finish
 AC_OUTPUT

@@ -9,12 +9,8 @@
 
 #include <stdint.h>
 
-/*
- * create .chippy data dir (authorized_mint_key in config + genesis).
- * generates a new mint keypair; writes only the pubkey to config.
- * mint_address_out / mint_secret_out may be NULL; if set, receives hex strings.
- */
-int chippy_op_init(const char *dir, char *mint_address_out, char *mint_secret_out);
+/* create .chippy data dir (empty config + genesis block) */
+int chippy_op_init(const char *dir);
 
 /*
  * append a signed tx (mint or transfer). verifies signature then persists.

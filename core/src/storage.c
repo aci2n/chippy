@@ -1,4 +1,5 @@
 #include "chippy.h"
+#include "log.h"
 
 #include <sodium.h>
 #include <errno.h>
@@ -78,38 +79,21 @@ static int push_block(chippy_chain *chain, chippy_block *block)
   return 0;
 }
 
-int chippy_storage_init(const char *dir, char *mint_address_out, char *mint_secret_out)
+int chippy_storage_init(const char *dir)
 {
   char config_path[CHIPPY_MAX_PATH];
   char chain_path[CHIPPY_MAX_PATH];
-  char mint_addr[CHIPPY_HEX_ADDR_LEN + 1];
-  unsigned char pk[crypto_sign_PUBLICKEYBYTES];
-  unsigned char sk[crypto_sign_SECRETKEYBYTES];
   chippy_block genesis;
   FILE *f;
   time_t now;
 
+  LOG_DEBUG("storage_init dir=%s", dir ? dir : "(null)");
   if (dir == NULL) {
     return -1;
   }
   if (mkdir_p(dir) != 0) {
+    LOG_DEBUG("storage_init mkdir failed dir=%s", dir);
     return -1;
-  }
-
-  if (chippy_keypair_generate(pk, sk) != 0) {
-    return -1;
-  }
-  if (chippy_pubkey_to_address(pk, mint_addr) != 0) {
-    return -1;
-  }
-  if (mint_address_out != NULL) {
-    strncpy(mint_address_out, mint_addr, CHIPPY_HEX_ADDR_LEN);
-    mint_address_out[CHIPPY_HEX_ADDR_LEN] = '\0';
-  }
-  if (mint_secret_out != NULL) {
-    if (chippy_hex_encode(sk, sizeof(sk), mint_secret_out, CHIPPY_HEX_SEC_LEN + 1) != 0) {
-      return -1;
-    }
   }
 
   if (path_join(config_path, sizeof(config_path), dir, "config") != 0) {
@@ -119,7 +103,6 @@ int chippy_storage_init(const char *dir, char *mint_address_out, char *mint_secr
   if (f == NULL) {
     return -1;
   }
-  fprintf(f, "authorized_mint_key=%s\n", mint_addr);
   fclose(f);
 
   memset(&genesis, 0, sizeof(genesis));
@@ -147,6 +130,7 @@ int chippy_storage_init(const char *dir, char *mint_address_out, char *mint_secr
   fprintf(f, "hash %s\n", genesis.hash);
   fprintf(f, "\n");
   fclose(f);
+  LOG_DEBUG("storage_init ok dir=%s genesis_hash=%s", dir, genesis.hash);
   return 0;
 }
 
@@ -168,7 +152,7 @@ static int parse_mint_key_line(const char *line, chippy_mint_keys *keys_out)
   return chippy_mint_keys_add(keys_out, val);
 }
 
-int chippy_storage_load_mint_keys(const char *dir, chippy_mint_keys *keys_out)
+static int load_authorized_mints(const char *dir, chippy_mint_keys *keys_out)
 {
   char config_path[CHIPPY_MAX_PATH];
   FILE *f;
@@ -192,9 +176,7 @@ int chippy_storage_load_mint_keys(const char *dir, chippy_mint_keys *keys_out)
     }
   }
   fclose(f);
-  if (keys_out->count == 0) {
-    return -1;
-  }
+  LOG_DEBUG("load_authorized_mints dir=%s count=%zu", dir, keys_out->count);
   return 0;
 }
 
@@ -210,11 +192,14 @@ int chippy_storage_add_authorized_mint_key(const char *dir, const char *addr_hex
   if (strlen(addr_hex) != CHIPPY_HEX_ADDR_LEN) {
     return -1;
   }
-  chippy_mint_keys_init(&keys);
-  (void)chippy_storage_load_mint_keys(dir, &keys);
+  if (load_authorized_mints(dir, &keys) != 0) {
+    return -1;
+  }
   if (chippy_mint_keys_contains(&keys, addr_hex)) {
+    LOG_DEBUG("storage_add_authorized_mint_key already present addr=%s", addr_hex);
     return 0;
   }
+  LOG_DEBUG("storage_add_authorized_mint_key dir=%s addr=%s", dir, addr_hex);
   if (path_join(config_path, sizeof(config_path), dir, "config") != 0) {
     return -1;
   }
@@ -263,9 +248,15 @@ int chippy_storage_load_chain(const char *dir, chippy_chain *chain)
     return -1;
   }
   chippy_chain_init(chain);
-  if (chippy_storage_load_mint_keys(dir, &chain->mint_keys) != 0) {
+  if (load_authorized_mints(dir, &chain->mint_keys) != 0) {
     return -1;
   }
+  if (chain->mint_keys.count == 0) {
+    LOG_DEBUG("storage_load_chain no authorized mint keys dir=%s", dir);
+    chippy_chain_free(chain);
+    return -1;
+  }
+  LOG_DEBUG("storage_load_chain dir=%s mint_keys=%zu", dir, chain->mint_keys.count);
   if (path_join(chain_path, sizeof(chain_path), dir, "chain") != 0) {
     return -1;
   }
@@ -365,6 +356,7 @@ int chippy_storage_load_chain(const char *dir, chippy_chain *chain)
     }
   }
   fclose(f);
+  LOG_DEBUG("storage_load_chain ok dir=%s blocks=%zu", dir, chain->block_count);
   return 0;
 }
 
@@ -378,6 +370,8 @@ int chippy_storage_append_block(const char *dir, const chippy_block *block)
   if (dir == NULL || block == NULL) {
     return -1;
   }
+  LOG_DEBUG("storage_append_block dir=%s index=%llu txs=%zu", dir,
+            (unsigned long long)block->index, block->tx_count);
   if (path_join(chain_path, sizeof(chain_path), dir, "chain") != 0) {
     return -1;
   }
@@ -398,6 +392,7 @@ int chippy_storage_append_block(const char *dir, const chippy_block *block)
   fprintf(f, "hash %s\n", block->hash);
   fprintf(f, "\n");
   fclose(f);
+  LOG_DEBUG("storage_append_block ok index=%llu", (unsigned long long)block->index);
   return 0;
 }
 

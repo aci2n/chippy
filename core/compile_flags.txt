@@ -1,2 +1,3 @@
 -I./include/
 -I/opt/homebrew/Cellar/libsodium/1.0.22/include/
+-I./vendor/

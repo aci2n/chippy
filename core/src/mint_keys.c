@@ -1,4 +1,5 @@
 #include "chippy.h"
+#include "log.h"
 
 #include <string.h>
 
@@ -31,6 +32,7 @@ int chippy_mint_keys_add(chippy_mint_keys *keys, const char *addr_hex)
   strncpy(keys->keys[keys->count], addr_hex, CHIPPY_HEX_ADDR_LEN);
   keys->keys[keys->count][CHIPPY_HEX_ADDR_LEN] = '\0';
   keys->count++;
+  LOG_DEBUG("mint_keys_add addr=%s total=%zu", addr_hex, keys->count);
   return 0;
 }
 

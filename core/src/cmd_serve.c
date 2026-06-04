@@ -1,20 +1,16 @@
-#include "server.h"
+#include "cmd_serve.h"
+
+#include "chippy.h"
+#include "http_server.h"
+#include "log.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define DEFAULT_API_URL "http://127.0.0.1:8080"
-#define DEFAULT_LISTEN "127.0.0.1:3000"
-
-static void usage(const char *prog)
-{
-  fprintf(stderr,
-          "usage: %s [--listen HOST:PORT] [--static-dir DIR]\n"
-          "  CHIPPY_API_URL   backend base URL (default %s)\n"
-          "  CHIPPY_LISTEN    same as --listen if set\n",
-          prog, DEFAULT_API_URL);
-}
+#ifndef CHIPPY_STATIC_DIR
+#define CHIPPY_STATIC_DIR "static"
+#endif
 
 static int parse_listen(const char *arg, char *host, size_t host_cap, char *port, size_t port_cap)
 {
@@ -36,27 +32,25 @@ static int parse_listen(const char *arg, char *host, size_t host_cap, char *port
   return 0;
 }
 
-int main(int argc, char **argv)
+static void usage(const char *prog)
 {
-  struct web_ctx ctx;
+  fprintf(stderr, "usage: %s serve [--dir .chippy] [--listen HOST:PORT]\n", prog);
+}
+
+int chippy_cmd_serve(int argc, char **argv)
+{
+  struct serve_ctx ctx;
   char host[256];
   char port[16];
   const char *listen;
   int i;
 
-#ifndef WEB_STATIC_DIR
-#define WEB_STATIC_DIR "static"
-#endif
-
-  ctx.api_url = getenv("CHIPPY_API_URL");
-  if (ctx.api_url == NULL || ctx.api_url[0] == '\0') {
-    ctx.api_url = DEFAULT_API_URL;
-  }
-  ctx.static_dir = WEB_STATIC_DIR;
+  ctx.data_dir = CHIPPY_DEFAULT_DIR;
+  ctx.static_dir = CHIPPY_STATIC_DIR;
 
   strncpy(host, "127.0.0.1", sizeof(host) - 1);
   host[sizeof(host) - 1] = '\0';
-  strncpy(port, "3000", sizeof(port) - 1);
+  strncpy(port, "8080", sizeof(port) - 1);
   port[sizeof(port) - 1] = '\0';
 
   listen = getenv("CHIPPY_LISTEN");
@@ -67,8 +61,12 @@ int main(int argc, char **argv)
     }
   }
 
-  for (i = 1; i < argc; i++) {
-    if (strcmp(argv[i], "--listen") == 0 && i + 1 < argc) {
+  LOG_DEBUG("serve starting static_dir=%s", ctx.static_dir);
+  for (i = 2; i < argc; i++) {
+    if (strcmp(argv[i], "--dir") == 0 && i + 1 < argc) {
+      ctx.data_dir = argv[++i];
+      LOG_DEBUG("serve data_dir=%s", ctx.data_dir);
+    } else if (strcmp(argv[i], "--listen") == 0 && i + 1 < argc) {
       if (parse_listen(argv[++i], host, sizeof(host), port, sizeof(port)) != 0) {
         usage(argv[0]);
         return 1;
@@ -81,9 +79,9 @@ int main(int argc, char **argv)
     }
   }
 
-  fprintf(stderr, "chippy web: static %s, api %s, listen %s:%s\n", ctx.static_dir, ctx.api_url,
-          host, port);
-  if (web_server_run(&ctx, host, port) != 0) {
+  LOG_DEBUG("serve listen %s:%s data_dir=%s", host, port, ctx.data_dir);
+  if (chippy_http_serve(&ctx, host, port) != 0) {
+    LOG_DEBUG("serve failed");
     return 1;
   }
   return 0;

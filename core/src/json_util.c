@@ -1,7 +1,9 @@
 #include "json_util.h"
+#include "log.h"
 
 #include <ctype.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static const char *find_key(const char *body, const char *key)
@@ -62,6 +64,7 @@ int json_get_string(const char *body, const char *key, char *out, size_t out_cap
   }
   memcpy(out, start, len);
   out[len] = '\0';
+  LOG_DEBUG("json_get_string key=%s len=%zu", key, len);
   return 0;
 }
 
@@ -91,5 +94,6 @@ int json_get_u64(const char *body, const char *key, uint64_t *out)
     return -1;
   }
   *out = (uint64_t)v;
+  LOG_DEBUG("json_get_u64 key=%s value=%llu", key, (unsigned long long)*out);
   return 0;
 }

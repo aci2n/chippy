@@ -1,7 +1,8 @@
-#include "api.h"
+#include "http_api.h"
 
 #include "chippy_ops.h"
 #include "json_util.h"
+#include "log.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -39,11 +40,12 @@ static int path_prefix(const char *path, size_t path_len, const char *prefix, si
 static void resp_json(struct http_response *resp, int status, const char *json)
 {
   resp->status = status;
+  snprintf(resp->content_type, sizeof(resp->content_type), "application/json");
   snprintf(resp->body, sizeof(resp->body), "%s", json);
 }
 
-void api_handle(struct api_ctx *ctx, const char *method, size_t method_len, const char *path,
-                size_t path_len, const char *body, size_t body_len, struct http_response *resp)
+void http_api_handle(struct api_ctx *ctx, const char *method, size_t method_len, const char *path,
+                     size_t path_len, const char *body, size_t body_len, struct http_response *resp)
 {
   size_t off;
   char addr[CHIPPY_HEX_ADDR_LEN + 1];
@@ -57,7 +59,11 @@ void api_handle(struct api_ctx *ctx, const char *method, size_t method_len, cons
 
   (void)body_len;
   memset(resp, 0, sizeof(*resp));
+  snprintf(resp->content_type, sizeof(resp->content_type), "application/json");
   resp_json(resp, 404, "{\"error\":\"not found\"}");
+
+  LOG_DEBUG("api %.*s %.*s body_len=%zu", (int)method_len, method, (int)path_len, path,
+            body_len);
 
   if (path_eq(path, path_len, "/health")) {
     if (method_len == 3 && memcmp(method, "GET", 3) == 0) {
@@ -81,11 +87,14 @@ void api_handle(struct api_ctx *ctx, const char *method, size_t method_len, cons
     }
     memcpy(addr, path + off, CHIPPY_HEX_ADDR_LEN);
     addr[CHIPPY_HEX_ADDR_LEN] = '\0';
+    LOG_DEBUG("api balance addr=%s", addr);
     rc = chippy_op_balance(ctx->data_dir, addr, &balance);
     if (rc != 0) {
+      LOG_DEBUG("api balance failed addr=%s", addr);
       resp_json(resp, 500, "{\"error\":\"balance failed\"}");
       return;
     }
+    LOG_DEBUG("api balance ok addr=%s balance=%llu", addr, (unsigned long long)balance);
     snprintf(resp->body, sizeof(resp->body), "{\"address\":\"%s\",\"balance\":%llu}", addr,
              (unsigned long long)balance);
     resp->status = 200;
@@ -96,8 +105,10 @@ void api_handle(struct api_ctx *ctx, const char *method, size_t method_len, cons
     if (method_len != 3 || memcmp(method, "GET", 3) != 0) {
       return;
     }
+    LOG_DEBUG("api validate dir=%s", ctx->data_dir);
     rc = chippy_op_validate(ctx->data_dir);
     if (rc != 0) {
+      LOG_DEBUG("api validate failed");
       resp_json(resp, 409, "{\"error\":\"chain invalid\"}");
       return;
     }
@@ -122,11 +133,14 @@ void api_handle(struct api_ctx *ctx, const char *method, size_t method_len, cons
     strncpy(tx.to, to, CHIPPY_HEX_ADDR_LEN);
     tx.amount = amount;
     strncpy(tx.sig, sig, CHIPPY_HEX_SIG_LEN);
+    LOG_DEBUG("api transfer from=%s to=%s amount=%llu", from, to, (unsigned long long)amount);
     rc = chippy_op_transfer(ctx->data_dir, &tx);
     if (rc != 0) {
+      LOG_DEBUG("api transfer rejected from=%s to=%s", from, to);
       resp_json(resp, 409, "{\"error\":\"transfer rejected\"}");
       return;
     }
+    LOG_DEBUG("api transfer ok");
     resp_json(resp, 200, "{\"ok\":true}");
     return;
   }
@@ -148,12 +162,17 @@ void api_handle(struct api_ctx *ctx, const char *method, size_t method_len, cons
     tx.to[CHIPPY_HEX_ADDR_LEN] = '\0';
     tx.amount = amount;
     strncpy(tx.sig, sig, CHIPPY_HEX_SIG_LEN);
+    LOG_DEBUG("api mint to=%s amount=%llu", to, (unsigned long long)amount);
     rc = chippy_op_mint(ctx->data_dir, &tx);
     if (rc != 0) {
+      LOG_DEBUG("api mint rejected to=%s", to);
       resp_json(resp, 409, "{\"error\":\"mint rejected\"}");
       return;
     }
+    LOG_DEBUG("api mint ok to=%s", to);
     resp_json(resp, 200, "{\"ok\":true}");
     return;
   }
+
+  LOG_DEBUG("api unhandled path");
 }

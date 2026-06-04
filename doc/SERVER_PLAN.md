@@ -1,5 +1,7 @@
 # Chippy server plan (resume notes)
 
+> **Obsolete.** Describes pre–PR #5 server wallets (`.sec` on disk) and a separate `backend/` binary. Current code: single `chippy serve`, client-side signing, `config` stores only `authorized_mint_key=` (public addresses).
+
 Personal ledger toy — not production security. State lives in a single `.chippy/` tree on disk.
 
 ## Decision: link the engine, do not shell to CLI
