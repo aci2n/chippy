@@ -53,3 +53,8 @@ core/chippy-asan
 *~
 \#*#
 .#*
+
+# pyinfra
+infra/.venv/
+infra/__pycache__/
+infra/**/__pycache__/

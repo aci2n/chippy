@@ -1,0 +1,11 @@
+# Optional: generate inventory.py HOSTS from this file.
+# Kept as documentation; pyinfra loads inventory.py by default.
+
+hosts:
+  - name: web1.example.com
+    ssh_user: root
+    groups: [debian, base, hardening, podman]
+
+  - name: db1.example.com
+    ssh_user: root
+    groups: [debian, base, hardening]
