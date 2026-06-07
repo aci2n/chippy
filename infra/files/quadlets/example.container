@@ -1,0 +1,18 @@
+[Unit]
+Description=Example nginx (rootless quadlet with registry auto-update)
+Documentation=https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=example-nginx
+Image=docker.io/library/nginx:alpine
+PublishPort=8080:80
+AutoUpdate=registry
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target
