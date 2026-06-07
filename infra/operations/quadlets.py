@@ -5,7 +5,7 @@ from pathlib import Path
 from pyinfra.api import deploy
 from pyinfra.operations import files, systemd
 
-from operations._helpers import data, in_group, string_put
+from operations._helpers import any_changed, data, in_group, string_put
 
 _QUADLET_DIR = Path(__file__).resolve().parent.parent / "files" / "quadlets"
 
@@ -45,6 +45,7 @@ def deploy_quadlets():
         return
 
     services_by_user: dict[str, list[str]] = {}
+    changes_by_user: dict[str, list] = {}
 
     for entry in quadlets:
         name = entry["name"]
@@ -64,7 +65,7 @@ def deploy_quadlets():
             _sudo=True,
         )
 
-        string_put(
+        quadlet_file = string_put(
             name=f"Deploy quadlet {filename}",
             dest=f"{dest_dir}/{filename}",
             contents=_quadlet_content(entry),
@@ -75,8 +76,19 @@ def deploy_quadlets():
         )
 
         services_by_user.setdefault(username, []).append(_service_name(filename))
+        changes_by_user.setdefault(username, []).append(quadlet_file)
 
     for username, services in sorted(services_by_user.items()):
+        quadlets_changed = any_changed(*changes_by_user[username])
+
+        systemd.daemon_reload(
+            name=f"Reload systemd user units for {username}",
+            user_mode=True,
+            user_name=username,
+            _if=quadlets_changed,
+            _sudo=True,
+        )
+
         for service in services:
             systemd.service(
                 name=f"Enable {service} for {username}",
@@ -85,6 +97,6 @@ def deploy_quadlets():
                 user_name=username,
                 enabled=True,
                 running=True,
-                daemon_reload=True,
+                _if=quadlets_changed,
                 _sudo=True,
             )

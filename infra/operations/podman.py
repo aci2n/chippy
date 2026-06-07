@@ -1,7 +1,7 @@
 """Podman installation and rootless prerequisites."""
 
 from pyinfra.api import deploy
-from pyinfra.operations import apt, files, server, systemd
+from pyinfra.operations import apt, files, systemd
 
 from operations._helpers import data, in_group
 
@@ -71,6 +71,7 @@ def enable_podman_auto_update():
         return
 
     for username in _rootless_users():
+        # Built-in timer unit — no daemon-reload needed; enable/start are fact-gated.
         systemd.service(
             name=f"Enable podman auto-update for {username}",
             service="podman-auto-update.timer",
@@ -78,6 +79,5 @@ def enable_podman_auto_update():
             user_name=username,
             enabled=True,
             running=True,
-            daemon_reload=True,
             _sudo=True,
         )

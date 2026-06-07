@@ -105,6 +105,21 @@ Requirements on the server:
 - Systemd user linger enabled (handled automatically)
 - Images use `AutoUpdate=registry` and/or label `io.containers.autoupdate=registry`
 
+## Change-aware restarts
+
+Operations capture return values from file edits and gate restarts/reloads with `_if`:
+
+```python
+config = files.line(...)
+systemd.service(
+    service="ssh",
+    restarted=True,
+    _if=config.did_change,
+)
+```
+
+Multiple edits use `any_changed` from `operations._helpers`. SSH, sysctl, fail2ban, and quadlet deploys follow this pattern so unchanged runs skip service restarts and `daemon-reload`.
+
 ## Suggested rollout order
 
 On fresh Debian hosts, run once with all groups:

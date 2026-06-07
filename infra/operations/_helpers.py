@@ -3,6 +3,9 @@
 from io import StringIO
 
 from pyinfra import host
+from pyinfra.operations.util import any_changed
+
+__all__ = ["any_changed", "data", "in_group", "string_put"]
 
 
 def in_group(name: str) -> bool:
@@ -17,7 +20,7 @@ def string_put(name: str, dest: str, contents: str, **kwargs):
     """Upload inline text via files.put (pyinfra 3 requires a src object)."""
     from pyinfra.operations import files
 
-    files.put(
+    return files.put(
         name=name,
         src=StringIO(contents),
         dest=dest,

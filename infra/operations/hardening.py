@@ -1,9 +1,9 @@
 """Common Debian hardening: sysctl, unattended upgrades, fail2ban."""
 
 from pyinfra.api import deploy
-from pyinfra.operations import apt, files, server, systemd
+from pyinfra.operations import apt, server, systemd
 
-from operations._helpers import data, in_group, string_put
+from operations._helpers import any_changed, data, in_group, string_put
 
 
 @deploy("Apply sysctl hardening")
@@ -19,7 +19,7 @@ def apply_sysctl():
     for key, value in sorted(settings.items()):
         lines.append(f"{key} = {value}\n")
 
-    string_put(
+    sysctl_config = string_put(
         name="Deploy sysctl hardening",
         dest="/etc/sysctl.d/99-pyinfra-hardening.conf",
         contents="".join(lines),
@@ -30,6 +30,7 @@ def apply_sysctl():
     server.shell(
         name="Apply sysctl settings",
         commands=["sysctl --system"],
+        _if=sysctl_config.did_change,
         _sudo=True,
     )
 
@@ -92,7 +93,7 @@ def configure_fail2ban():
     if not cfg.get("enabled", False):
         return
 
-    apt.packages(
+    install = apt.packages(
         name="Install fail2ban",
         packages=["fail2ban"],
         present=True,
@@ -107,7 +108,7 @@ def configure_fail2ban():
         "\n[sshd]\n",
         "enabled = true\n",
     ]
-    string_put(
+    jail_config = string_put(
         name="Deploy fail2ban jail config",
         dest="/etc/fail2ban/jail.local",
         contents="".join(jail_lines),
@@ -116,10 +117,19 @@ def configure_fail2ban():
     )
 
     systemd.service(
-        name="Enable fail2ban",
+        name="Restart fail2ban after jail change",
+        service="fail2ban",
+        restarted=True,
+        _if=jail_config.did_change,
+        _sudo=True,
+    )
+
+    systemd.service(
+        name="Ensure fail2ban enabled",
         service="fail2ban",
         enabled=True,
         running=True,
+        _if=any_changed(install, jail_config),
         _sudo=True,
     )
 
@@ -142,11 +152,25 @@ def configure_firewall():
 
     default_in = cfg.get("default_incoming", "deny")
     default_out = cfg.get("default_outgoing", "allow")
+    allow_ports = cfg.get("allow_ports", [])
+
+    rules_config = string_put(
+        name="Deploy ufw desired state",
+        dest="/etc/pyinfra-ufw.conf",
+        contents=(
+            f"default_incoming={default_in}\n"
+            f"default_outgoing={default_out}\n"
+            f"allow_ports={','.join(str(p) for p in allow_ports)}\n"
+        ),
+        mode="0644",
+        _sudo=True,
+    )
+
     commands = [
         f"ufw default {default_in} incoming",
         f"ufw default {default_out} outgoing",
     ]
-    for rule in cfg.get("allow_ports", []):
+    for rule in allow_ports:
         if isinstance(rule, int):
             commands.append(f"ufw allow {rule}/tcp")
         else:
@@ -157,5 +181,6 @@ def configure_firewall():
     server.shell(
         name="Apply ufw rules",
         commands=commands,
+        _if=rules_config.did_change,
         _sudo=True,
     )
