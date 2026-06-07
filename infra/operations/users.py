@@ -3,7 +3,7 @@
 from pyinfra.api import deploy
 from pyinfra.operations import server
 
-from operations._helpers import data, in_group, string_put
+from operations._helpers import data, in_group, linger_disabled, string_put
 
 
 @deploy("Configure local users")
@@ -57,5 +57,6 @@ def enable_linger_for_users():
         server.shell(
             name=f"Enable systemd linger for {username}",
             commands=[f"loginctl enable-linger {username}"],
+            _if=linger_disabled(username),
             _sudo=True,
         )

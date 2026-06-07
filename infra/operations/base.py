@@ -3,7 +3,7 @@
 from pyinfra.api import deploy
 from pyinfra.operations import apt, server
 
-from operations._helpers import data, in_group
+from operations._helpers import data, in_group, timezone_differs
 
 
 @deploy("Install baseline packages")
@@ -47,5 +47,6 @@ def configure_timezone():
     server.shell(
         name=f"Set timezone to {timezone}",
         commands=[f"timedatectl set-timezone {timezone}"],
+        _if=timezone_differs(timezone),
         _sudo=True,
     )

@@ -3,7 +3,7 @@
 from pyinfra.api import deploy
 from pyinfra.operations import apt, files, systemd
 
-from operations._helpers import data, in_group
+from operations._helpers import data, file_missing_line, in_group, unit_inactive, unit_not_enabled
 
 
 def _rootless_users():
@@ -50,6 +50,7 @@ def configure_subids():
             path="/etc/subuid",
             line=subid_line,
             replace=f"^{username}:.*",
+            _if=file_missing_line("/etc/subuid", subid_line),
             _sudo=True,
         )
         files.line(
@@ -57,6 +58,7 @@ def configure_subids():
             path="/etc/subgid",
             line=subid_line,
             replace=f"^{username}:.*",
+            _if=file_missing_line("/etc/subgid", subid_line),
             _sudo=True,
         )
 
@@ -71,7 +73,13 @@ def enable_podman_auto_update():
         return
 
     for username in _rootless_users():
-        # Built-in timer unit — no daemon-reload needed; enable/start are fact-gated.
+
+        def _timer_needs_setup(user=username):
+            return (
+                unit_not_enabled("podman-auto-update.timer", user_mode=True, user_name=user)()
+                or unit_inactive("podman-auto-update.timer", user_mode=True, user_name=user)()
+            )
+
         systemd.service(
             name=f"Enable podman auto-update for {username}",
             service="podman-auto-update.timer",
@@ -79,5 +87,6 @@ def enable_podman_auto_update():
             user_name=username,
             enabled=True,
             running=True,
+            _if=_timer_needs_setup,
             _sudo=True,
         )

@@ -3,7 +3,7 @@
 from pyinfra.api import deploy
 from pyinfra.operations import apt, server, systemd
 
-from operations._helpers import any_changed, data, in_group, string_put
+from operations._helpers import any_changed, data, in_group, string_put, unit_inactive
 
 
 @deploy("Apply sysctl hardening")
@@ -124,12 +124,15 @@ def configure_fail2ban():
         _sudo=True,
     )
 
+    def _fail2ban_needs_ensure():
+        return any_changed(install, jail_config)() or unit_inactive("fail2ban")()
+
     systemd.service(
         name="Ensure fail2ban enabled",
         service="fail2ban",
         enabled=True,
         running=True,
-        _if=any_changed(install, jail_config),
+        _if=_fail2ban_needs_ensure,
         _sudo=True,
     )
 

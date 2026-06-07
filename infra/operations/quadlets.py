@@ -5,7 +5,7 @@ from pathlib import Path
 from pyinfra.api import deploy
 from pyinfra.operations import files, systemd
 
-from operations._helpers import any_changed, data, in_group, string_put
+from operations._helpers import any_changed, data, in_group, string_put, unit_inactive
 
 _QUADLET_DIR = Path(__file__).resolve().parent.parent / "files" / "quadlets"
 
@@ -32,7 +32,22 @@ def _quadlet_content(entry: dict) -> str:
         path = _QUADLET_DIR / template
         return path.read_text()
 
-    raise ValueError(f"quadlet {entry.get('name')!r} needs 'content' or 'template'")
+    raise ValueError(f"quadlet {entry!r} needs 'content' or 'template'")
+
+
+def _quadlet_or_service_needs_action(
+    quadlets_changed,
+    username: str,
+    service: str,
+):
+    """Reload/enable when quadlet changed or the user service is not running."""
+
+    def _check() -> bool:
+        if quadlets_changed():
+            return True
+        return unit_inactive(service, user_mode=True, user_name=username)()
+
+    return _check
 
 
 @deploy("Deploy rootless quadlets")
@@ -97,6 +112,6 @@ def deploy_quadlets():
                 user_name=username,
                 enabled=True,
                 running=True,
-                _if=quadlets_changed,
+                _if=_quadlet_or_service_needs_action(quadlets_changed, username, service),
                 _sudo=True,
             )

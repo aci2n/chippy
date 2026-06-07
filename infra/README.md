@@ -105,20 +105,35 @@ Requirements on the server:
 - Systemd user linger enabled (handled automatically)
 - Images use `AutoUpdate=registry` and/or label `io.containers.autoupdate=registry`
 
-## Change-aware restarts
+## Change-aware and fact-gated operations
 
-Operations capture return values from file edits and gate restarts/reloads with `_if`:
+pyinfra has two deferred checks (never use plain `if` for these):
+
+**After a file edit** — `did_change` / `any_changed`:
 
 ```python
 config = files.line(...)
-systemd.service(
-    service="ssh",
-    restarted=True,
-    _if=config.did_change,
+systemd.service(service="ssh", restarted=True, _if=config.did_change)
+```
+
+**Remote state** — facts inside `_if`:
+
+```python
+from operations._helpers import linger_disabled
+
+server.shell(
+    commands=["loginctl enable-linger deploy"],
+    _if=linger_disabled("deploy"),
 )
 ```
 
-Multiple edits use `any_changed` from `operations._helpers`. SSH, sysctl, fail2ban, and quadlet deploys follow this pattern so unchanged runs skip service restarts and `daemon-reload`.
+Helpers in `operations/_helpers.py` wrap common facts (`Timezone`, `SystemdStatus`, `FindInFile`, custom `SystemdLinger`). Custom facts live in `facts/`.
+
+Combine both when needed — quadlets reload on config change **or** restart a stopped service:
+
+```python
+_if=lambda: quadlets_changed() or unit_inactive("myapp", user_mode=True, user_name="deploy")()
+```
 
 ## Suggested rollout order
 

@@ -9,6 +9,8 @@ Limit to a group or host:
     pyinfra inventory.py deploy.py --limit web1.example.com
 """
 
+import facts  # noqa: F401 — register custom facts
+
 from operations import base, hardening, podman, quadlets, ssh, users
 
 # Importing registers @deploy operations with pyinfra.
